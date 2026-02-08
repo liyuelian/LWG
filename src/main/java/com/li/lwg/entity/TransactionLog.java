@@ -1,7 +1,5 @@
 package com.li.lwg.entity;
 
-import lombok.Data;
-
 import java.time.LocalDateTime;
 
 /**
@@ -9,7 +7,6 @@ import java.time.LocalDateTime;
  * @date 2026/2/8
  * @desc 资金流水实体
  */
-@Data
 public class TransactionLog {
     /**
      * 主键ID
@@ -55,4 +52,76 @@ public class TransactionLog {
      * 创建时间
      */
     private LocalDateTime createTime;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
+    }
+
+    public Long getMissionId() {
+        return missionId;
+    }
+
+    public void setMissionId(Long missionId) {
+        this.missionId = missionId;
+    }
+
+    public Long getAmount() {
+        return amount;
+    }
+
+    public void setAmount(Long amount) {
+        this.amount = amount;
+    }
+
+    public Long getBalanceAfter() {
+        return balanceAfter;
+    }
+
+    public void setBalanceAfter(Long balanceAfter) {
+        this.balanceAfter = balanceAfter;
+    }
+
+    public Integer getType() {
+        return type;
+    }
+
+    public void setType(Integer type) {
+        this.type = type;
+    }
+
+    public String getOrderNo() {
+        return orderNo;
+    }
+
+    public void setOrderNo(String orderNo) {
+        this.orderNo = orderNo;
+    }
+
+    public String getRemark() {
+        return remark;
+    }
+
+    public void setRemark(String remark) {
+        this.remark = remark;
+    }
+
+    public LocalDateTime getCreateTime() {
+        return createTime;
+    }
+
+    public void setCreateTime(LocalDateTime createTime) {
+        this.createTime = createTime;
+    }
 }

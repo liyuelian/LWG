@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.li.lwg.mapper.UserMapper">
+
+    <resultMap id="UserResultMap" type="com.li.lwg.entity.User">
+        <id column="id" property="id"/>
+        <result column="username" property="username"/>
+        <result column="password" property="password"/>
+        <result column="realm" property="realm"/>
+        <result column="balance" property="balance"/>
+        <result column="frozen_balance" property="frozenBalance"/>
+        <result column="status" property="status"/>
+        <result column="version" property="version"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id
+        ,username,password,realm,balance,
+        frozen_balance,status,version,create_time,update_time
+    </sql>
+
+    <select id="selectById" resultMap="UserResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM t_user
+        WHERE id = #{id}
+    </select>
+
+    <update id="freezeBalance">
+        UPDATE t_user
+        SET balance        = balance - #{amount},
+            frozen_balance = frozen_balance + #{amount},
+            update_time    = NOW()
+        WHERE id = #{userId}
+          AND balance >= #{amount}  </update>
+
+
+</mapper>
