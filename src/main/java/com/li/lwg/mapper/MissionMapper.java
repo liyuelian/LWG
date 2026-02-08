@@ -1,7 +1,10 @@
 package com.li.lwg.mapper;
 
+import com.li.lwg.dto.MissionQueryReq;
 import com.li.lwg.entity.Mission;
 import org.apache.ibatis.annotations.Mapper;
+
+import java.util.List;
 
 /**
  * @author liyuelian
@@ -16,4 +19,10 @@ public interface MissionMapper {
      * @return 反馈
      */
     int insert(Mission mission);
+
+    /**
+     * 查询任务
+     * @return
+     */
+    List<Mission> selectList(MissionQueryReq req);
 }

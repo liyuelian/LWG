@@ -41,5 +41,31 @@
                 NOW(), NOW())
     </insert>
 
+    <select id="selectList" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM t_mission
+        <where>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+
+            <if test="missionType != null">
+                AND mission_type = #{missionType}
+            </if>
+            <if test="difficulty != null">
+                AND difficulty = #{difficulty}
+            </if>
+            <if test="minRealm != null">
+                AND min_realm &lt;= #{minRealm}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                <bind name="pattern" value="'%' + keyword + '%'"/>
+                AND (title LIKE #{pattern} OR description LIKE #{pattern})
+            </if>
+        </where>
+        ORDER BY create_time DESC
+    </select>
+
 
 </mapper>

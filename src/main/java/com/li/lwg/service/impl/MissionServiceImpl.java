@@ -1,6 +1,7 @@
 package com.li.lwg.service.impl;
 
 import com.li.lwg.dto.MissionPublishReq;
+import com.li.lwg.dto.MissionQueryReq;
 import com.li.lwg.entity.Mission;
 import com.li.lwg.entity.TransactionLog;
 import com.li.lwg.entity.User;
@@ -14,6 +15,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -67,5 +69,14 @@ public class MissionServiceImpl implements MissionService {
         transactionLogMapper.insert(log);
         return mission.getId();
 
+    }
+
+    @Override
+    public List<Mission> getMissionList(MissionQueryReq req) {
+        if (req.getStatus() == null) {
+            //待接单(0)
+            req.setStatus(0);
+        }
+        return missionMapper.selectList(req);
     }
 }

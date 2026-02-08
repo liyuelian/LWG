@@ -1,6 +1,10 @@
 package com.li.lwg.service;
 
 import com.li.lwg.dto.MissionPublishReq;
+import com.li.lwg.dto.MissionQueryReq;
+import com.li.lwg.entity.Mission;
+
+import java.util.List;
 
 /**
  * @author liyuelian
@@ -13,4 +17,12 @@ public interface MissionService {
      * @return 发布成功的任务ID
      */
     Long publishMission(MissionPublishReq req);
+
+    /**
+     * 条件筛选查询任务
+     *
+     * @param req 筛选条件
+     * @return 任务列
+     */
+    List<Mission> getMissionList(MissionQueryReq req);
 }
