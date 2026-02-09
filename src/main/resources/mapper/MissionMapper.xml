@@ -67,5 +67,23 @@
         ORDER BY create_time DESC
     </select>
 
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM t_mission
+        WHERE id = #{id}
+    </select>
+
+    <update id="acceptMission">
+        UPDATE t_mission
+        SET status      = 1,
+            acceptor_id = #{acceptorId},
+            accept_time = NOW(),
+            version     = version + 1,
+            update_time = NOW()
+        WHERE id = #{id}
+          AND status = 0
+          AND version = #{version}   </update>
+
 
 </mapper>

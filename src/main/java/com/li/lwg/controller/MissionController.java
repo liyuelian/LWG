@@ -1,6 +1,7 @@
 package com.li.lwg.controller;
 
 import com.li.lwg.common.Result;
+import com.li.lwg.dto.MissionAcceptReq;
 import com.li.lwg.dto.MissionPublishReq;
 import com.li.lwg.dto.MissionQueryReq;
 import com.li.lwg.entity.Mission;
@@ -30,5 +31,14 @@ public class MissionController {
     public Result<List<Mission>> list(@RequestBody MissionQueryReq req) {
         List<Mission> list = missionService.getMissionList(req);
         return Result.success(list);
+    }
+
+    /**
+     * 抢单接口
+     */
+    @PostMapping("/accept")
+    public Result<String> accept(@RequestBody MissionAcceptReq req) {
+        missionService.acceptMission(req);
+        return Result.success("抢单成功，请尽快完成任务！");
     }
 }

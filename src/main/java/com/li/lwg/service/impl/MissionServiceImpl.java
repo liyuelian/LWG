@@ -1,5 +1,6 @@
 package com.li.lwg.service.impl;
 
+import com.li.lwg.dto.MissionAcceptReq;
 import com.li.lwg.dto.MissionPublishReq;
 import com.li.lwg.dto.MissionQueryReq;
 import com.li.lwg.entity.Mission;
@@ -78,5 +79,43 @@ public class MissionServiceImpl implements MissionService {
             req.setStatus(0);
         }
         return missionMapper.selectList(req);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean acceptMission(MissionAcceptReq req) {
+        // 1. 先查询任务状态 (这一步拿到 version)
+        Mission mission = missionMapper.selectById(req.getMissionId());
+
+        // 2. 基础校验 (Fail Fast)
+        if (mission == null) {
+            throw new ServiceException("任务不存在");
+        }
+        if (mission.getStatus() != 0) {
+            throw new ServiceException("手慢了，任务已被抢走或取消");
+        }
+        if (mission.getPublisherId().equals(req.getAcceptorId())) {
+            throw new ServiceException("道友，不能接自己发布的悬赏刷单哦");
+        }
+
+        User acceptor = userMapper.selectById(req.getAcceptorId());
+        if (acceptor == null) {
+            throw new ServiceException("抢单失败：接单弟子不存在（ID无效）");
+        }
+
+        // 3. 执行乐观锁更新 (CAS: Compare And Swap)
+        // 传入刚才查出来的 version。如果数据库里 version 变了，这里会返回 0
+        int rows = missionMapper.acceptMission(
+                req.getMissionId(),
+                req.getAcceptorId(),
+                mission.getVersion()
+        );
+
+        if (rows == 0) {
+            // 返回 0 说明你在 select 和 update 之间，有人抢先一步改了数据
+            throw new ServiceException("抢单失败，该任务十分抢手，请刷新重试");
+        }
+
+        return true;
     }
 }

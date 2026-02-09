@@ -1,5 +1,6 @@
 package com.li.lwg.service;
 
+import com.li.lwg.dto.MissionAcceptReq;
 import com.li.lwg.dto.MissionPublishReq;
 import com.li.lwg.dto.MissionQueryReq;
 import com.li.lwg.entity.Mission;
@@ -25,4 +26,10 @@ public interface MissionService {
      * @return 任务列
      */
     List<Mission> getMissionList(MissionQueryReq req);
+
+    /**
+     * 抢单
+     * @return 是否成功
+     */
+    boolean acceptMission(MissionAcceptReq req);
 }
