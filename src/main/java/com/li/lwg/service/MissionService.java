@@ -3,6 +3,7 @@ package com.li.lwg.service;
 import com.li.lwg.dto.MissionAcceptReq;
 import com.li.lwg.dto.MissionPublishReq;
 import com.li.lwg.dto.MissionQueryReq;
+import com.li.lwg.dto.MissionSubmitReq;
 import com.li.lwg.entity.Mission;
 
 import java.util.List;
@@ -29,7 +30,15 @@ public interface MissionService {
 
     /**
      * 抢单
+     *
      * @return 是否成功
      */
     boolean acceptMission(MissionAcceptReq req);
+
+    /**
+     * 提交任务
+     *
+     * @return 是否成功
+     */
+    boolean submitMission(MissionSubmitReq req);
 }

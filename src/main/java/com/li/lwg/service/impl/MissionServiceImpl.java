@@ -3,6 +3,7 @@ package com.li.lwg.service.impl;
 import com.li.lwg.dto.MissionAcceptReq;
 import com.li.lwg.dto.MissionPublishReq;
 import com.li.lwg.dto.MissionQueryReq;
+import com.li.lwg.dto.MissionSubmitReq;
 import com.li.lwg.entity.Mission;
 import com.li.lwg.entity.TransactionLog;
 import com.li.lwg.entity.User;
@@ -15,6 +16,7 @@ import jakarta.annotation.Resource;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.UUID;
@@ -31,6 +33,8 @@ public class MissionServiceImpl implements MissionService {
     private MissionMapper missionMapper;
     @Resource
     private TransactionLogMapper transactionLogMapper;
+    @Resource
+    private ObjectMapper objectMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -114,6 +118,47 @@ public class MissionServiceImpl implements MissionService {
         if (rows == 0) {
             // 返回 0 说明你在 select 和 update 之间，有人抢先一步改了数据
             throw new ServiceException("抢单失败，该任务十分抢手，请刷新重试");
+        }
+
+        return true;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean submitMission(MissionSubmitReq req) {
+        // 1. 简单校验
+        if (req.getProofData() == null) {
+            throw new ServiceException("交付凭证不能为空，请上传妖丹或任务记录");
+        }
+
+        String proofJsonStr = "{}";
+        try {
+            proofJsonStr = objectMapper.writeValueAsString(req.getProofData());
+        } catch (Exception e) {
+            throw new ServiceException("凭证格式错误，无法解析");
+        }
+
+        // 2. 执行更新 (Mapper里已经限制了必须是本人且状态为1)
+        int rows = missionMapper.submitMission(
+                req.getMissionId(),
+                req.getUserId(),
+                proofJsonStr
+        );
+
+        if (rows == 0) {
+            // 如果更新失败，可能是任务ID不对，或者不是这人接的，或者状态不是进行中
+            // 为了给用户更精确的提示，可以先查一下 (可选优化)
+            Mission mission = missionMapper.selectById(req.getMissionId());
+            if (mission == null) {
+                throw new ServiceException("任务不存在");
+            }
+            if (!mission.getAcceptorId().equals(req.getUserId())) {
+                throw new ServiceException("这不是你接的任务，无法交付");
+            }
+            if (mission.getStatus() != 1) {
+                throw new ServiceException("任务状态异常，无法交付");
+            }
+            throw new ServiceException("提交失败，请重试");
         }
 
         return true;

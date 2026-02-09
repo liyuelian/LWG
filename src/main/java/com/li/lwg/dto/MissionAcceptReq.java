@@ -3,6 +3,7 @@ package com.li.lwg.dto;
 /**
  * @author liyuelian
  * @date 2026/2/9
+ * 抢单dto
  */
 public class MissionAcceptReq {
     /**

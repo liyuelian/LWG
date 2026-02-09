@@ -45,4 +45,16 @@ public interface MissionMapper {
     int acceptMission(@Param("id") Long id,
                       @Param("acceptorId") Long acceptorId,
                       @Param("version") Integer version);
+
+    /**
+     * 提交任务
+     *
+     * @param id        任务ID
+     * @param userId    提交人ID (用于校验)
+     * @param proofData 凭证
+     * @return 影响行数
+     */
+    int submitMission(@Param("id") Long id,
+                      @Param("userId") Long userId,
+                      @Param("proofData") String proofData);
 }

@@ -4,6 +4,7 @@ import com.li.lwg.common.Result;
 import com.li.lwg.dto.MissionAcceptReq;
 import com.li.lwg.dto.MissionPublishReq;
 import com.li.lwg.dto.MissionQueryReq;
+import com.li.lwg.dto.MissionSubmitReq;
 import com.li.lwg.entity.Mission;
 import com.li.lwg.service.MissionService;
 import jakarta.annotation.Resource;
@@ -40,5 +41,14 @@ public class MissionController {
     public Result<String> accept(@RequestBody MissionAcceptReq req) {
         missionService.acceptMission(req);
         return Result.success("抢单成功，请尽快完成任务！");
+    }
+
+    /**
+     * 交付任务接口
+     */
+    @PostMapping("/submit")
+    public Result<String> submit(@RequestBody MissionSubmitReq req) {
+        missionService.submitMission(req);
+        return Result.success("任务交付成功，请等待发布者验收结算！");
     }
 }

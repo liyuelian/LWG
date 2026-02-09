@@ -83,7 +83,20 @@
             update_time = NOW()
         WHERE id = #{id}
           AND status = 0
-          AND version = #{version}   </update>
+          AND version = #{version}
+    </update>
+
+
+    <update id="submitMission">
+        UPDATE t_mission
+        SET status      = 2,
+            proof_data  = #{proofData},
+            submit_time = NOW(),
+            update_time = NOW()
+        WHERE id = #{id}
+          AND acceptor_id = #{userId}
+          AND status = 1
+    </update>
 
 
 </mapper>

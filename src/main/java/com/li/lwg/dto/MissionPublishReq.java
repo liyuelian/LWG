@@ -3,6 +3,7 @@ package com.li.lwg.dto;
 /**
  * @author liyuelian
  * @date 2026/2/8
+ * 任务发布dto
  */
 public class MissionPublishReq {
     private Long publisherId; // 实际项目中这个应该从 Token 获取，MVP先传参
