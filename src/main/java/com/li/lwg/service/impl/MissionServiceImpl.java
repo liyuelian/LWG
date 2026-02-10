@@ -1,5 +1,6 @@
 package com.li.lwg.service.impl;
 
+import com.li.lwg.common.TransactionType;
 import com.li.lwg.dto.*;
 import com.li.lwg.entity.Mission;
 import com.li.lwg.entity.TransactionLog;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -64,7 +66,7 @@ public class MissionServiceImpl implements MissionService {
         log.setMissionId(mission.getId());
         log.setAmount(-req.getReward());
         log.setBalanceAfter(user.getBalance());
-        log.setType(2); // 发布冻结
+        log.setType(TransactionType.PUBLISH.getCode());
         log.setOrderNo(UUID.randomUUID().toString());
         log.setRemark("发布悬赏：" + req.getTitle());
 
@@ -196,6 +198,26 @@ public class MissionServiceImpl implements MissionService {
             if (rows2 == 0) {
                 throw new ServiceException("结算失败：接单用户账户异常");
             }
+
+            // 3.3 记录双向流水 ===
+
+            // A. 记录发布者：结算支出-扣除发布者的冻结账户金额
+            TransactionLog logPub = new TransactionLog();
+            logPub.setUserId(mission.getPublisherId());
+            logPub.setType(TransactionType.SETTLEMENT.getCode());
+            logPub.setAmount(-mission.getReward()); // 支出记负数
+            logPub.setRemark("任务结算成功，扣除冻结金：" + mission.getTitle());
+            logPub.setCreateTime(LocalDateTime.now());
+            transactionLogMapper.insert(logPub);
+
+            // B. 记录接单者：任务收益
+            TransactionLog logAcc = new TransactionLog();
+            logAcc.setUserId(mission.getAcceptorId());
+            logAcc.setType(TransactionType.INCOME.getCode());
+            logAcc.setAmount(mission.getReward()); // 收入记正数
+            logAcc.setRemark("完成悬赏任务奖励：" + mission.getTitle());
+            logAcc.setCreateTime(LocalDateTime.now());
+            transactionLogMapper.insert(logAcc);
 
             // 3.3 更新任务状态 -> 3 (已完成)
             missionMapper.updateStatus(mission.getId(), 3);
