@@ -1,9 +1,6 @@
 package com.li.lwg.service.impl;
 
-import com.li.lwg.dto.MissionAcceptReq;
-import com.li.lwg.dto.MissionPublishReq;
-import com.li.lwg.dto.MissionQueryReq;
-import com.li.lwg.dto.MissionSubmitReq;
+import com.li.lwg.dto.*;
 import com.li.lwg.entity.Mission;
 import com.li.lwg.entity.TransactionLog;
 import com.li.lwg.entity.User;
@@ -161,6 +158,55 @@ public class MissionServiceImpl implements MissionService {
             throw new ServiceException("提交失败，请重试");
         }
 
+        return true;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean auditMission(MissionAuditReq req) {
+        // 1. 查询任务详情
+        Mission mission = missionMapper.selectById(req.getMissionId());
+
+        // 2. 基础风控校验 (Fail Fast)
+        if (mission == null) {
+            throw new ServiceException("任务不存在");
+        }
+        // 校验身份：只有发布者才有资格审核
+        if (!mission.getPublisherId().equals(req.getUserId())) {
+            throw new ServiceException("无权审核他人发布的任务");
+        }
+        // 校验状态：只有“待结算(2)”状态的任务才能审核
+        if (mission.getStatus() != 2) {
+            throw new ServiceException("任务状态异常，无法结算（可能已结算或未提交）");
+        }
+
+        // 3. 核心业务分支
+        if (req.getPass()) {
+            // === 分支 A: 审核通过 (发钱！) ===
+
+            // 3.1 扣减发布者冻结金额 (支出)
+            // 这一步如果返回 0，说明发布者冻结余额不对劲（比如被系统扣过费了），必须回滚
+            int rows1 = userMapper.decreaseFrozen(mission.getPublisherId(), mission.getReward());
+            if (rows1 == 0) {
+                throw new ServiceException("结算失败：发布者冻结资金异常");
+            }
+
+            // 3.2 增加接单者可用余额 (收入)
+            int rows2 = userMapper.increaseBalance(mission.getAcceptorId(), mission.getReward());
+            if (rows2 == 0) {
+                throw new ServiceException("结算失败：接单用户账户异常");
+            }
+
+            // 3.3 更新任务状态 -> 3 (已完成)
+            missionMapper.updateStatus(mission.getId(), 3);
+
+        } else {
+            // === 分支 B: 审核驳回 (打回重做) ===
+
+            // 3.4 状态回滚 -> 1 (进行中)
+            // 钱不动，继续冻结在平台，等待弟子重新提交凭证
+            missionMapper.updateStatus(mission.getId(), 1);
+        }
         return true;
     }
 }

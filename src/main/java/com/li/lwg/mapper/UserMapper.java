@@ -28,4 +28,22 @@ public interface UserMapper {
      */
     User selectById(@Param("id") Long id);
 
+    /**
+     * 扣减冻结余额 (发布者结算支出)
+     *
+     * @param userId 用户ID
+     * @param amount 金额
+     * @return 影响行数
+     */
+    int decreaseFrozen(@Param("userId") Long userId, @Param("amount") Long amount);
+
+    /**
+     * 增加可用余额 (接单者获得工资)
+     *
+     * @param userId 用户ID
+     * @param amount 金额
+     * @return 影响行数
+     */
+    int increaseBalance(@Param("userId") Long userId, @Param("amount") Long amount);
+
 }

@@ -35,7 +35,23 @@
             frozen_balance = frozen_balance + #{amount},
             update_time    = NOW()
         WHERE id = #{userId}
-          AND balance >= #{amount}  </update>
+          AND balance >= #{amount}
+    </update>
+
+    <update id="decreaseFrozen">
+        UPDATE t_user
+        SET frozen_balance = frozen_balance - #{amount},
+            update_time    = NOW()
+        WHERE id = #{userId}
+          AND frozen_balance >= #{amount}
+    </update>
+
+    <update id="increaseBalance">
+        UPDATE t_user
+        SET balance     = balance + #{amount},
+            update_time = NOW()
+        WHERE id = #{userId}
+    </update>
 
 
 </mapper>

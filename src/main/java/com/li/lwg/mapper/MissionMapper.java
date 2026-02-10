@@ -57,4 +57,13 @@ public interface MissionMapper {
     int submitMission(@Param("id") Long id,
                       @Param("userId") Long userId,
                       @Param("proofData") String proofData);
+
+    /**
+     * 更新任务状态
+     *
+     * @param id     任务ID
+     * @param status 新状态
+     * @return 影响行数
+     */
+    int updateStatus(@Param("id") Long id, @Param("status") Integer status);
 }
