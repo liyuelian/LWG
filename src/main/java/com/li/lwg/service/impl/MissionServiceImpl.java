@@ -193,39 +193,51 @@ public class MissionServiceImpl implements MissionService {
                 throw new ServiceException("结算失败：发布者冻结资金异常");
             }
 
-            // 3.2 增加接单者可用余额 (收入)
+            // 3.2 扣完钱后，查询发布者的账户状态
+            User publisher = userMapper.selectById(mission.getPublisherId());
+
+            // 3.3 记录流水：发布者支出
+            TransactionLog logPub = new TransactionLog();
+            logPub.setUserId(mission.getPublisherId());
+            logPub.setType(TransactionType.SETTLEMENT.getCode());
+            logPub.setAmount(-mission.getReward());
+            logPub.setMissionId(mission.getId());
+            // todo 快照暂记的是发布者的“可用账户余额”
+            //  后续资金流水表可加一个字段 account_type（账户类型）
+            //  发布时：记一笔“可用账户”减少 100，再记一笔“冻结账户”增加 100。
+            //  结算时：记一笔“冻结账户”减少 100。
+            logPub.setBalanceAfter(publisher.getBalance());
+            logPub.setRemark("任务结算成功，扣除冻结金：" + mission.getTitle());
+            logPub.setCreateTime(LocalDateTime.now());
+            transactionLogMapper.insert(logPub);
+
+            // 3.4 增加接单者账户金额 (收益)
             int rows2 = userMapper.increaseBalance(mission.getAcceptorId(), mission.getReward());
             if (rows2 == 0) {
                 throw new ServiceException("结算失败：接单用户账户异常");
             }
 
-            // 3.3 记录双向流水 ===
+            // 3.5 加完钱后，查询接单者者的账户状态
+            User acceptor = userMapper.selectById(mission.getAcceptorId());
 
-            // A. 记录发布者：结算支出-扣除发布者的冻结账户金额
-            TransactionLog logPub = new TransactionLog();
-            logPub.setUserId(mission.getPublisherId());
-            logPub.setType(TransactionType.SETTLEMENT.getCode());
-            logPub.setAmount(-mission.getReward()); // 支出记负数
-            logPub.setRemark("任务结算成功，扣除冻结金：" + mission.getTitle());
-            logPub.setCreateTime(LocalDateTime.now());
-            transactionLogMapper.insert(logPub);
-
-            // B. 记录接单者：任务收益
+            // 3.6 记录流水：接单者收入
             TransactionLog logAcc = new TransactionLog();
             logAcc.setUserId(mission.getAcceptorId());
             logAcc.setType(TransactionType.INCOME.getCode());
-            logAcc.setAmount(mission.getReward()); // 收入记正数
+            logAcc.setAmount(mission.getReward());
+            logAcc.setMissionId(mission.getId());
+            logAcc.setBalanceAfter(acceptor.getBalance());
             logAcc.setRemark("完成悬赏任务奖励：" + mission.getTitle());
             logAcc.setCreateTime(LocalDateTime.now());
             transactionLogMapper.insert(logAcc);
 
-            // 3.3 更新任务状态 -> 3 (已完成)
+            //更新任务状态
             missionMapper.updateStatus(mission.getId(), 3);
 
         } else {
             // === 分支 B: 审核驳回 (打回重做) ===
 
-            // 3.4 状态回滚 -> 1 (进行中)
+            // 状态回滚 -> 1 (进行中)
             // 钱不动，继续冻结在平台，等待弟子重新提交凭证
             missionMapper.updateStatus(mission.getId(), 1);
         }
