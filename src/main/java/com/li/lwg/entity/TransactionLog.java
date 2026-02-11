@@ -39,6 +39,13 @@ public class TransactionLog {
     private Integer type;
 
     /**
+     * 资产类型
+     * 1: 可用余额 (Available)
+     * 2: 冻结余额 (Frozen)
+     */
+    private Integer assetType;
+
+    /**
      * 外部订单号 (唯一)
      */
     private String orderNo;
@@ -123,5 +130,13 @@ public class TransactionLog {
 
     public void setCreateTime(LocalDateTime createTime) {
         this.createTime = createTime;
+    }
+
+    public Integer getAssetType() {
+        return assetType;
+    }
+
+    public void setAssetType(Integer assetType) {
+        this.assetType = assetType;
     }
 }

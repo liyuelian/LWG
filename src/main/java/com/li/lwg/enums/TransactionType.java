@@ -1,4 +1,4 @@
-package com.li.lwg.common;
+package com.li.lwg.enums;
 
 /**
  * @author liyuelian
@@ -9,29 +9,25 @@ package com.li.lwg.common;
 public enum TransactionType {
 
     /**
-     * 1: 发布任务 (余额 -> 冻结)
+     * 1: 发布悬赏 (涉及：可用余额减少 + 冻结余额增加)
      */
     PUBLISH(1, "发布悬赏"),
 
     /**
-     * 2: 任务结算-支出 (冻结 -> 扣除)
+     * 2: 任务结算-支出 (涉及：冻结余额减少)
      */
     SETTLEMENT(2, "结算支出"),
 
     /**
-     * 3: 任务结算-收入 (系统 -> 余额)
+     * 3: 任务结算-收入 (涉及：可用余额增加)
      */
     INCOME(3, "任务收益"),
 
     /**
-     * 4: 充值 (预留)
+     * 4: 任务取消/驳回退款 (涉及：冻结余额减少 + 可用余额增加) - 预留
      */
-    RECHARGE(4, "充值"),
+    REFUND(4, "悬赏退回");
 
-    /**
-     * 5: 提现 (预留)
-     */
-    WITHDRAW(5, "提现");
 
     private final int code;
     private final String desc;

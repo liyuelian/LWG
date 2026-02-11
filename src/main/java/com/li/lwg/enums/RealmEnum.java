@@ -1,4 +1,4 @@
-package com.li.lwg.entity.enums;
+package com.li.lwg.enums;
 
 import lombok.Getter;
 
