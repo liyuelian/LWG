@@ -10,22 +10,23 @@
         <result column="amount" property="amount" jdbcType="BIGINT"/>
         <result column="balance_after" property="balanceAfter" jdbcType="BIGINT"/>
         <result column="type" property="type" jdbcType="TINYINT"/>
+        <result column="asset_type" property="assetType"  jdbcType="TINYINT"/>
         <result column="order_no" property="orderNo" jdbcType="VARCHAR"/>
         <result column="remark" property="remark" jdbcType="VARCHAR"/>
         <result column="create_time" property="createTime" jdbcType="TIMESTAMP"/>
     </resultMap>
 
     <sql id="Base_Column_List">
-        id
-        , user_id, mission_id, amount, balance_after, `type`, order_no, remark, create_time
+        id, user_id, mission_id, amount, balance_after,
+          `type`,asset_type, order_no, remark, create_time
     </sql>
 
     <insert id="insert" parameterType="com.li.lwg.entity.TransactionLog" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO t_transaction_log
         (user_id, mission_id, amount, balance_after,
-         type, order_no, remark, create_time)
+         type, asset_type, order_no, remark, create_time)
         VALUES (#{userId}, #{missionId}, #{amount}, #{balanceAfter},
-                #{type}, #{orderNo}, #{remark}, NOW())
+                #{type}, #{assetType}, #{orderNo}, #{remark}, NOW())
     </insert>
 
 
