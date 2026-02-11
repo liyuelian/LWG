@@ -45,4 +45,12 @@ public interface MissionService {
      * @return 是否通过
      */
     boolean auditMission(MissionAuditReq req);
+
+    /**
+     * 查询【我发布/接取】的任务
+     * @param userId 用户id
+     * @param type 1-发布 2-接取
+     * @return 任务列表
+     */
+    List<Mission> getMyMissions(Long userId, Integer type);
 }

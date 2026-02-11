@@ -66,4 +66,12 @@ public interface MissionMapper {
      * @return 影响行数
      */
     int updateStatus(@Param("id") Long id, @Param("status") Integer status);
+
+    /**
+     * 查询我的任务列表
+     * @param userId 用户id
+     * @param type 任务状态 1-发布的任务 2-接收的任务
+     * @return 任务列表
+     */
+    List<Mission> selectMyMissions(@Param("userId") Long userId, @Param("type") Integer type);
 }

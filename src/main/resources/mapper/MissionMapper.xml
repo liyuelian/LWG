@@ -105,4 +105,17 @@
         WHERE id = #{id}
     </update>
 
+    <select id="selectMyMissions" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM t_mission
+        WHERE 1=1
+        <if test="type == 1">
+            AND publisher_id = #{userId}
+        </if>
+        <if test="type == 2">
+            AND acceptor_id = #{userId}
+        </if>
+        ORDER BY create_time DESC
+    </select>
 </mapper>

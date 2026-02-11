@@ -269,4 +269,9 @@ public class MissionServiceImpl implements MissionService {
         }
         return true;
     }
+
+    @Override
+    public List<Mission> getMyMissions(Long userId, Integer type) {
+        return missionMapper.selectMyMissions(userId, type);
+    }
 }

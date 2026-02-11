@@ -67,4 +67,17 @@ public class MissionController {
             return Result.success("审核驳回！已通知接单人重新修改凭证。");
         }
     }
+
+
+    /**
+     * 查询我的任务
+     */
+    @GetMapping("/my-missions")
+    public Result<List<Mission>> getMyMissions(@RequestParam Long userId, @RequestParam Integer type) {
+        // 简单参数校验
+        if (type == null || (type != 1 && type != 2)) {
+            return Result.error("参数错误：type 必须为 1(发布) 或 2(接取)");
+        }
+        return Result.success(missionService.getMyMissions(userId, type));
+    }
 }
