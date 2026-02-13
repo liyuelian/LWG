@@ -26,7 +26,11 @@ public enum TransactionType {
     /**
      * 4: 任务取消/驳回退款 (涉及：冻结余额减少 + 可用余额增加) - 预留
      */
-    REFUND(4, "悬赏退回");
+    REFUND(4, "悬赏退回"),
+    /**
+     * 5：灵石充值-收入
+     */
+    RECHARGE(5, "灵石充值");;
 
 
     private final int code;

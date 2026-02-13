@@ -46,4 +46,12 @@ public interface UserMapper {
      */
     int increaseBalance(@Param("userId") Long userId, @Param("amount") Long amount);
 
+    /**
+     * 用户充值
+     *
+     * @param userId 用户ID
+     * @param amount 金额(分)
+     * @return 影响行数
+     */
+    int addBalance(@Param("userId") Long userId, @Param("amount") Long amount);
 }

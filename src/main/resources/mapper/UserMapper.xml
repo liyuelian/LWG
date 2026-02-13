@@ -53,5 +53,14 @@
         WHERE id = #{userId}
     </update>
 
+    <update id="addBalance">
+        UPDATE t_user
+        SET
+            balance = balance + #{amount},
+            version = version + 1,
+            update_time = NOW()
+        WHERE id = #{userId}
+          AND status = 1
+    </update>
 
 </mapper>

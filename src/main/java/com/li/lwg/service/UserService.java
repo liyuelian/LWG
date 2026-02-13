@@ -1,5 +1,6 @@
 package com.li.lwg.service;
 
+import com.li.lwg.dto.UserRechargeReq;
 import com.li.lwg.entity.TransactionLog;
 import com.li.lwg.entity.User;
 
@@ -21,4 +22,11 @@ public interface UserService {
      * @return 流水列表
      */
     List<TransactionLog> getMyTransactions(Long userId);
+
+    /**
+     * 用户充值接口
+     *
+     * @param req
+     */
+    void recharge(UserRechargeReq req);
 }
