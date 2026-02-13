@@ -1,5 +1,9 @@
 package com.li.lwg.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
+import java.time.LocalDateTime;
+
 /**
  * @author liyuelian
  * @date 2026/2/8
@@ -13,6 +17,16 @@ public class MissionPublishReq {
     private Integer difficulty;
     private Integer minRealm;
     private Long reward;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    private LocalDateTime deadline;
+
+    public LocalDateTime getDeadline() {
+        return deadline;
+    }
+
+    public void setDeadline(LocalDateTime deadline) {
+        this.deadline = deadline;
+    }
 
     public Long getPublisherId() {
         return publisherId;

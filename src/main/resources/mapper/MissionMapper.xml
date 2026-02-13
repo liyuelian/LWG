@@ -35,9 +35,9 @@
     <insert id="insert" parameterType="com.li.lwg.entity.Mission" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO t_mission
         (title, description, mission_type, difficulty, min_realm,
-         reward, publisher_id, status, version, create_time, update_time)
+         reward, publisher_id, deadline,status, version, create_time, update_time)
         VALUES (#{title}, #{description}, #{missionType}, #{difficulty}, #{minRealm},
-                #{reward}, #{publisherId}, 0, 0,
+                #{reward}, #{publisherId}, #{deadline},0, 0,
                 NOW(), NOW())
     </insert>
 
