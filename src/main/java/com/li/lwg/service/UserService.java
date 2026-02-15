@@ -5,6 +5,7 @@ import com.li.lwg.dto.TransactionPageReq;
 import com.li.lwg.dto.UserRechargeReq;
 import com.li.lwg.entity.TransactionLog;
 import com.li.lwg.entity.User;
+import com.li.lwg.vo.FinanceChartVO;
 import com.li.lwg.vo.FinanceOverviewVO;
 
 import java.util.List;
@@ -46,4 +47,11 @@ public interface UserService {
      * 筛选查询用户流水
      */
     PageResult<TransactionLog> getTransactionPage(TransactionPageReq req);
+
+    /**
+     * 查询用户近12个月收支情况
+     * @param userId 用户ID
+     * @return 折线图数据、饼图数据
+     */
+    FinanceChartVO getFinanceCharts(Long userId);
 }

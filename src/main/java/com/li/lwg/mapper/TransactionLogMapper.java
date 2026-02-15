@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author liyuelian
@@ -49,5 +50,31 @@ public interface TransactionLogMapper {
      * 流水明细 - 总数查询
      */
     Long countTransaction(TransactionPageReq req);
+
+    /**
+     * 查趋势：按月分组统计 (近12个月)用户的收支情况
+     *
+     * @param userId       用户ID
+     * @param startTime    开始时间 (yyyy-MM-dd HH:mm:ss)
+     * @param incomeTypes  动态收入ID列表
+     * @param expenseTypes 动态支出ID列表
+     */
+    List<Map<String, Object>> selectYearlyTrend(
+            @Param("userId") Long userId,
+            @Param("startTime") String startTime,
+            @Param("incomeTypes") List<Integer> incomeTypes,
+            @Param("expenseTypes") List<Integer> expenseTypes
+    );
+
+    /**
+     * 查分布：按类型分组统计用户收支
+     *
+     * @param userId   用户ID
+     * @param typeList 需要统计的所有类型ID (收入+支出)
+     */
+    List<Map<String, Object>> selectTypeDistribution(
+            @Param("userId") Long userId,
+            @Param("typeList") List<Integer> typeList
+    );
 
 }

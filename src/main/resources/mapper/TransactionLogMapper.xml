@@ -106,4 +106,44 @@
         <include refid="Page_Condition"/>
     </select>
 
+    <select id="selectYearlyTrend" resultType="java.util.Map">
+        SELECT
+        DATE_FORMAT(create_time, '%Y-%m') AS month,
+
+        SUM(CASE
+        WHEN type IN
+        <foreach collection="incomeTypes" item="t" open="(" separator="," close=")">
+            #{t}
+        </foreach>
+        THEN amount ELSE 0 END) AS income,
+
+        SUM(CASE
+        WHEN type IN
+        <foreach collection="expenseTypes" item="t" open="(" separator="," close=")">
+            #{t}
+        </foreach>
+        THEN ABS(amount) ELSE 0 END) AS expense
+
+        FROM t_transaction_log
+        WHERE user_id = #{userId}
+        AND create_time >= #{startTime}
+        GROUP BY month
+        ORDER BY month ASC
+    </select>
+
+    <select id="selectTypeDistribution" resultType="java.util.Map">
+        SELECT
+        type,
+        SUM(ABS(amount)) AS total
+        FROM t_transaction_log
+        WHERE user_id = #{userId}
+        <if test="typeList != null and typeList.size() > 0">
+            AND type IN
+            <foreach collection="typeList" item="t" open="(" separator="," close=")">
+                #{t}
+            </foreach>
+        </if>
+        GROUP BY type
+    </select>
+
 </mapper>

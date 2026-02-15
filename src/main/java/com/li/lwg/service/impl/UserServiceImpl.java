@@ -12,15 +12,16 @@ import com.li.lwg.mapper.TransactionLogMapper;
 import com.li.lwg.mapper.UserMapper;
 import com.li.lwg.service.UserService;
 import com.li.lwg.vo.FinanceOverviewVO;
+import com.li.lwg.vo.FinanceChartVO;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -134,5 +135,86 @@ public class UserServiceImpl implements UserService {
         Long total = transactionLogMapper.countTransaction(req);
 
         return new PageResult<>(total, list);
+    }
+
+    @Override
+    public FinanceChartVO getFinanceCharts(Long userId) {
+        // 1. 时间范围：最近 12 个月
+        LocalDate today = LocalDate.now();
+        // 比如现在是 2026-02，起始就是 2025-03-01
+        LocalDate startMonth = today.minusMonths(11).withDayOfMonth(1);
+        String startTimeStr = startMonth.atStartOfDay().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+        // 2. 准备动态类型 (从枚举获取)
+        // 真实收入
+        List<Integer> incomeTypes = TransactionType.getRealIncomeTypes();
+        // 真实支出
+        List<Integer> expenseTypes = TransactionType.getRealExpenseTypes();
+
+        // 3. 查趋势图数据 (DB返回的是稀疏数据，可能缺月份)
+        List<Map<String, Object>> rawTrend = transactionLogMapper.selectYearlyTrend(
+                userId, startTimeStr, incomeTypes, expenseTypes
+        );
+
+        // --- 核心补零逻辑 Start ---
+        // 将 DB 数据转为 Map 方便查找
+        Map<String, Long> incomeMap = new HashMap<>();
+        Map<String, Long> expenseMap = new HashMap<>();
+        for (Map<String, Object> m : rawTrend) {
+            String month = (String) m.get("month");
+            // 使用 BigDecimal 转 Long 防止类型转换报错
+            incomeMap.put(month, new BigDecimal(m.get("income").toString()).longValue());
+            expenseMap.put(month, new BigDecimal(m.get("expense").toString()).longValue());
+        }
+
+        // 构造连续的 12 个月
+        List<String> months = new ArrayList<>();
+        List<Long> incomeList = new ArrayList<>();
+        List<Long> expenseList = new ArrayList<>();
+
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM");
+        for (int i = 0; i < 12; i++) {
+            // 生成 "2025-03"
+            String key = startMonth.plusMonths(i).format(fmt);
+            months.add(key);
+            // 有数据填数据，没数据填 0
+            incomeList.add(incomeMap.getOrDefault(key, 0L));
+            expenseList.add(expenseMap.getOrDefault(key, 0L));
+        }
+        // --- 核心补零逻辑 End ---
+
+        // 4. 查饼图数据
+        List<Integer> allRealTypes = new ArrayList<>();
+        allRealTypes.addAll(incomeTypes);
+        allRealTypes.addAll(expenseTypes);
+
+        List<Map<String, Object>> rawPie = transactionLogMapper.selectTypeDistribution(userId, allRealTypes);
+
+        // 4.1 转换饼图 (ID 转 中文名)
+        List<FinanceChartVO.PieItem> pieList = new ArrayList<>();
+        if (rawPie != null) {
+            for (Map<String, Object> map : rawPie) {
+                Integer typeId = (Integer) map.get("type");
+                Long value = new BigDecimal(map.get("total").toString()).longValue();
+
+                // 查枚举获取中文描述
+                String name = Arrays.stream(TransactionType.values())
+                        .filter(e -> e.getCode() == typeId)
+                        .map(TransactionType::getDesc)
+                        .findFirst()
+                        .orElse("未知类型");
+
+                pieList.add(new FinanceChartVO.PieItem(name, value));
+            }
+        }
+
+        // 5. 组装返回
+        FinanceChartVO vo = new FinanceChartVO();
+        vo.setTrendMonths(months);
+        vo.setTrendIncome(incomeList);
+        vo.setTrendExpense(expenseList);
+        vo.setPieData(pieList);
+
+        return vo;
     }
 }

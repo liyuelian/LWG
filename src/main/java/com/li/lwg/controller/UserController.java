@@ -7,6 +7,7 @@ import com.li.lwg.dto.UserRechargeReq;
 import com.li.lwg.entity.TransactionLog;
 import com.li.lwg.entity.User;
 import com.li.lwg.service.UserService;
+import com.li.lwg.vo.FinanceChartVO;
 import com.li.lwg.vo.FinanceOverviewVO;
 import jakarta.annotation.Resource;
 import org.springframework.validation.annotation.Validated;
@@ -64,5 +65,13 @@ public class UserController {
     @PostMapping("/transaction/list")
     public Result<PageResult<TransactionLog>> getTransactionList(@RequestBody TransactionPageReq req) {
         return Result.success(userService.getTransactionPage(req));
+    }
+
+    /**
+     * 查询用户近12个月收支情况
+     */
+    @GetMapping("/finance/charts")
+    public Result<FinanceChartVO> getFinanceCharts(@RequestParam Long userId) {
+        return Result.success(userService.getFinanceCharts(userId));
     }
 }
