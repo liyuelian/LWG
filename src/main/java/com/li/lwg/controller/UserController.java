@@ -1,6 +1,8 @@
 package com.li.lwg.controller;
 
+import com.li.lwg.common.PageResult;
 import com.li.lwg.common.Result;
+import com.li.lwg.dto.TransactionPageReq;
 import com.li.lwg.dto.UserRechargeReq;
 import com.li.lwg.entity.TransactionLog;
 import com.li.lwg.entity.User;
@@ -54,5 +56,13 @@ public class UserController {
     @GetMapping("/finance/overview")
     public Result<FinanceOverviewVO> getFinanceOverview(@RequestParam Long userId) {
         return Result.success(userService.getFinanceOverview(userId));
+    }
+
+    /**
+     * 条件筛选用户流水
+     */
+    @PostMapping("/transaction/list")
+    public Result<PageResult<TransactionLog>> getTransactionList(@RequestBody TransactionPageReq req) {
+        return Result.success(userService.getTransactionPage(req));
     }
 }

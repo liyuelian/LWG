@@ -73,4 +73,37 @@
         WHERE user_id = #{userId}
     </select>
 
+    <sql id="Page_Condition">
+        WHERE user_id = #{userId}
+
+        <if test="startDate != null and startDate != ''">
+            AND create_time &gt;= CONCAT(#{startDate}, ' 00:00:00')
+        </if>
+        <if test="endDate != null and endDate != ''">
+            AND create_time &lt;= CONCAT(#{endDate}, ' 23:59:59')
+        </if>
+
+        <if test="typeList != null and typeList.size() > 0">
+            AND type IN
+            <foreach collection="typeList" item="t" open="(" separator="," close=")">
+                #{t}
+            </foreach>
+        </if>
+    </sql>
+
+    <select id="selectTransactionPage" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM t_transaction_log
+        <include refid="Page_Condition"/>
+        ORDER BY create_time DESC
+        LIMIT #{offset}, #{pageSize}
+    </select>
+
+    <select id="countTransaction" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM t_transaction_log
+        <include refid="Page_Condition"/>
+    </select>
+
 </mapper>

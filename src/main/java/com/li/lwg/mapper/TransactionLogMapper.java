@@ -1,5 +1,6 @@
 package com.li.lwg.mapper;
 
+import com.li.lwg.dto.TransactionPageReq;
 import com.li.lwg.entity.TransactionLog;
 import com.li.lwg.vo.FinanceOverviewVO;
 import org.apache.ibatis.annotations.Mapper;
@@ -38,5 +39,15 @@ public interface TransactionLogMapper {
             @Param("incomeTypes") List<Integer> incomeTypes,
             @Param("expenseTypes") List<Integer> expenseTypes
     );
+
+    /**
+     * 流水明细 - 列表查询
+     */
+    List<TransactionLog> selectTransactionPage(TransactionPageReq req);
+
+    /**
+     * 流水明细 - 总数查询
+     */
+    Long countTransaction(TransactionPageReq req);
 
 }

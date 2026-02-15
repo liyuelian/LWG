@@ -1,5 +1,7 @@
 package com.li.lwg.service.impl;
 
+import com.li.lwg.common.PageResult;
+import com.li.lwg.dto.TransactionPageReq;
 import com.li.lwg.dto.UserRechargeReq;
 import com.li.lwg.entity.TransactionLog;
 import com.li.lwg.enums.TransactionType;
@@ -114,5 +116,23 @@ public class UserServiceImpl implements UserService {
                 incomeTypes,
                 expenseTypes
         );
+    }
+
+    @Override
+    public PageResult<TransactionLog> getTransactionPage(TransactionPageReq req) {
+        // 设置 资金动账类型枚举 类型列表
+        if ("income".equals(req.getCategory())) {
+            req.setTypeList(TransactionType.getRealIncomeTypes());
+        } else if ("expense".equals(req.getCategory())) {
+            req.setTypeList(TransactionType.getRealExpenseTypes());
+        } else if ("locked".equals(req.getCategory())) {
+            req.setTypeList(TransactionType.getInternalTypes());
+        }
+
+        // offset 会在 DTO 内部自动计算
+        List<TransactionLog> list = transactionLogMapper.selectTransactionPage(req);
+        Long total = transactionLogMapper.countTransaction(req);
+
+        return new PageResult<>(total, list);
     }
 }

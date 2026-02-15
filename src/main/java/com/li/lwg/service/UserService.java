@@ -1,5 +1,7 @@
 package com.li.lwg.service;
 
+import com.li.lwg.common.PageResult;
+import com.li.lwg.dto.TransactionPageReq;
 import com.li.lwg.dto.UserRechargeReq;
 import com.li.lwg.entity.TransactionLog;
 import com.li.lwg.entity.User;
@@ -19,6 +21,7 @@ public interface UserService {
 
     /**
      * 我的交易流水查询
+     *
      * @param userId 用户id
      * @return 流水列表
      */
@@ -38,4 +41,9 @@ public interface UserService {
      * @return 累积、本月收支
      */
     FinanceOverviewVO getFinanceOverview(Long userId);
+
+    /**
+     * 筛选查询用户流水
+     */
+    PageResult<TransactionLog> getTransactionPage(TransactionPageReq req);
 }

@@ -60,6 +60,16 @@ public enum TransactionType {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 获取所有【内部流转/冻结】的类型 ID
+     */
+    public static List<Integer> getInternalTypes() {
+        return Arrays.stream(values())
+                .filter(t -> t.category == 0)
+                .map(TransactionType::getCode)
+                .collect(Collectors.toList());
+    }
+
     TransactionType(int code, String desc, int category) {
         this.code = code;
         this.desc = desc;
