@@ -37,4 +37,40 @@
         ORDER BY create_time DESC
     </select>
 
+    <select id="selectUserFinanceOverview" resultType="com.li.lwg.vo.FinanceOverviewVO">
+        SELECT
+        IFNULL(SUM(CASE
+        WHEN type IN
+        <foreach collection="incomeTypes" item="t" open="(" separator="," close=")">
+            #{t}
+        </foreach>
+        THEN amount ELSE 0 END), 0) AS totalIncome,
+
+        IFNULL(SUM(CASE
+        WHEN type IN
+        <foreach collection="expenseTypes" item="t" open="(" separator="," close=")">
+            #{t}
+        </foreach>
+        THEN ABS(amount) ELSE 0 END), 0) AS totalExpense,
+
+        IFNULL(SUM(CASE
+        WHEN create_time >= #{monthStart}
+        AND type IN
+        <foreach collection="incomeTypes" item="t" open="(" separator="," close=")">
+            #{t}
+        </foreach>
+        THEN amount ELSE 0 END), 0) AS monthIncome,
+
+        IFNULL(SUM(CASE
+        WHEN create_time >= #{monthStart}
+        AND type IN
+        <foreach collection="expenseTypes" item="t" open="(" separator="," close=")">
+            #{t}
+        </foreach>
+        THEN ABS(amount) ELSE 0 END), 0) AS monthExpense
+
+        FROM t_transaction_log
+        WHERE user_id = #{userId}
+    </select>
+
 </mapper>

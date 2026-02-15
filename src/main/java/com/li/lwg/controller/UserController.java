@@ -5,6 +5,7 @@ import com.li.lwg.dto.UserRechargeReq;
 import com.li.lwg.entity.TransactionLog;
 import com.li.lwg.entity.User;
 import com.li.lwg.service.UserService;
+import com.li.lwg.vo.FinanceOverviewVO;
 import jakarta.annotation.Resource;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -45,5 +46,13 @@ public class UserController {
     public Result<String> recharge(@RequestBody @Validated UserRechargeReq req) {
         userService.recharge(req);
         return Result.success("充值成功，灵石已到账！");
+    }
+
+    /**
+     * 查询用户【累计收支】和【本月收支】
+     */
+    @GetMapping("/finance/overview")
+    public Result<FinanceOverviewVO> getFinanceOverview(@RequestParam Long userId) {
+        return Result.success(userService.getFinanceOverview(userId));
     }
 }

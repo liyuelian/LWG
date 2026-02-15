@@ -3,6 +3,7 @@ package com.li.lwg.service;
 import com.li.lwg.dto.UserRechargeReq;
 import com.li.lwg.entity.TransactionLog;
 import com.li.lwg.entity.User;
+import com.li.lwg.vo.FinanceOverviewVO;
 
 import java.util.List;
 
@@ -29,4 +30,12 @@ public interface UserService {
      * @param req
      */
     void recharge(UserRechargeReq req);
+
+    /**
+     * 查询用户【累计收支】和【本月收支】
+     *
+     * @param userId 用户ID
+     * @return 累积、本月收支
+     */
+    FinanceOverviewVO getFinanceOverview(Long userId);
 }

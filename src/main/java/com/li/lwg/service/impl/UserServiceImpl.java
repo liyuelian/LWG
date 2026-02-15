@@ -9,11 +9,14 @@ import com.li.lwg.exception.ServiceException;
 import com.li.lwg.mapper.TransactionLogMapper;
 import com.li.lwg.mapper.UserMapper;
 import com.li.lwg.service.UserService;
+import com.li.lwg.vo.FinanceOverviewVO;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 
@@ -86,5 +89,30 @@ public class UserServiceImpl implements UserService {
         log.setCreateTime(LocalDateTime.now());
 
         transactionLogMapper.insert(log);
+    }
+
+    @Override
+    public FinanceOverviewVO getFinanceOverview(Long userId) {
+        // 默认参数：本月1号 00:00:00
+        LocalDate today = LocalDate.now();
+        LocalDateTime firstDayOfMonth = today.withDayOfMonth(1).atStartOfDay();
+        String monthStartStr = firstDayOfMonth.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+        // 类型参数从枚举中动态获取
+        // 以后加新类型，只需改枚举，不用改这里
+        List<Integer> incomeTypes = TransactionType.getRealIncomeTypes();
+        List<Integer> expenseTypes = TransactionType.getRealExpenseTypes();
+
+        // 兜底：防止空列表导致 SQL 报错 (如果没有定义支出类型)
+        if (incomeTypes.isEmpty()) incomeTypes.add(-999);
+        if (expenseTypes.isEmpty()) expenseTypes.add(-999);
+
+        // 执行查询
+        return transactionLogMapper.selectUserFinanceOverview(
+                userId,
+                monthStartStr,
+                incomeTypes,
+                expenseTypes
+        );
     }
 }
