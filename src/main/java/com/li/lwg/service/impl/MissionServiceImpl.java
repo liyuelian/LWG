@@ -6,6 +6,7 @@ import com.li.lwg.dto.MissionQueryReq;
 import com.li.lwg.dto.MissionSubmitReq;
 import com.li.lwg.dto.MissionAuditReq;
 import com.li.lwg.enums.AssetType;
+import com.li.lwg.enums.RealmEnum;
 import com.li.lwg.enums.TransactionType;
 import com.li.lwg.entity.Mission;
 import com.li.lwg.entity.TransactionLog;
@@ -126,6 +127,16 @@ public class MissionServiceImpl implements MissionService {
         User acceptor = userMapper.selectById(req.getAcceptorId());
         if (acceptor == null) {
             throw new ServiceException("抢单失败：接单弟子不存在（ID无效）");
+        }
+
+        // 获取任务要求的最低境界 (默认1-炼气期)
+        int minRealm = mission.getMinRealm() == null ? RealmEnum.LIAN_QI.getCode() : mission.getMinRealm();
+        // 获取用户当前境界 (默认1-炼气期)
+        int userRealm = acceptor.getRealm() == null ? RealmEnum.LIAN_QI.getCode() : acceptor.getRealm();
+
+        if (userRealm < minRealm) {
+            String requireRealm = RealmEnum.fromCode(mission.getMinRealm()).getDesc();
+            throw new ServiceException("道友修为尚浅，此悬赏需【" + requireRealm + "】方可接取！");
         }
 
         // 3. 执行乐观锁更新 (CAS: Compare And Swap)
