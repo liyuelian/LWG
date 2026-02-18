@@ -4,6 +4,8 @@ import com.li.lwg.entity.ReputationLog;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 @Mapper
 public interface ReputationLogMapper {
 
@@ -23,4 +25,7 @@ public interface ReputationLogMapper {
      * @return 记录条数
      */
     int countBySource(@Param("sourceId") Long sourceId, @Param("sourceType") Integer sourceType);
+
+    List<ReputationLog> selectByUserId(@Param("userId") Long userId);
+
 }

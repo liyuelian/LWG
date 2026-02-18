@@ -5,7 +5,9 @@ import com.li.lwg.common.Result;
 import com.li.lwg.dto.TransactionPageReq;
 import com.li.lwg.dto.UserRechargeReq;
 import com.li.lwg.entity.TransactionLog;
+import com.li.lwg.entity.ReputationLog;
 import com.li.lwg.entity.User;
+import com.li.lwg.service.ReputationService;
 import com.li.lwg.service.UserService;
 import com.li.lwg.vo.FinanceChartVO;
 import com.li.lwg.vo.FinanceOverviewVO;
@@ -30,6 +32,9 @@ public class UserController {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private ReputationService reputationService;
 
 
     @GetMapping("/info")
@@ -74,4 +79,16 @@ public class UserController {
     public Result<FinanceChartVO> getFinanceCharts(@RequestParam Long userId) {
         return Result.success(userService.getFinanceCharts(userId));
     }
+
+    /**
+     * 查询我的信誉流水
+     */
+    @GetMapping("/reputation/list")
+    public Result<PageResult<ReputationLog>> getMyReputationLogs(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam Long userId) {
+        return Result.success(reputationService.getMyReputationLog(page, size, userId));
+    }
+
 }

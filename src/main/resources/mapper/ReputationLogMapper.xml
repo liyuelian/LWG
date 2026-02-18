@@ -30,4 +30,17 @@
           AND source_type = #{sourceType}
     </select>
 
+    <sql id="Base_Column_List">
+        id, user_id, change_score , current_score , source_type ,
+        source_id, remark,  create_time
+    </sql>
+
+    <select id="selectByUserId" resultType="com.li.lwg.entity.ReputationLog">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM t_reputation_log
+        WHERE user_id = #{userId}
+        ORDER BY create_time DESC
+    </select>
+
 </mapper>
