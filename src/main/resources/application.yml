@@ -11,6 +11,24 @@ spring:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: GMT+8
 
+  rabbitmq:
+    # 基础连接信息
+    host: 127.0.0.1      # RabbitMQ 服务器地址
+    port: 5672           # 默认端口
+    username: admin      # 默认账号
+    password: admin123      # 默认密码
+    virtual-host: /      # 虚拟主机 (默认为 /)
+
+    # 消息确认机制
+    publisher-confirm-type: correlated  # 开启发送方确认 (ConfirmCallback)
+    publisher-returns: true             # 开启发送方回退 (ReturnCallback)
+
+    # 消费端配置
+    listener:
+      simple:
+        acknowledge-mode: manual        # 开启手动ACK
+        prefetch: 1                     # 每次只取 1 条
+
 mybatis:
   mapper-locations: classpath:mapper/*.xml  # 指定 XML 文件的位置
   configuration:

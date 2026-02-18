@@ -54,4 +54,13 @@ public interface UserMapper {
      * @return 影响行数
      */
     int addBalance(@Param("userId") Long userId, @Param("amount") Long amount);
+
+    /**
+     * 更新信誉值
+     *
+     * @param userId     用户ID
+     * @param reputation 信誉值
+     * @return 影响行数
+     */
+    int updateReputation(@Param("userId") Long userId, @Param("reputation") int reputation);
 }

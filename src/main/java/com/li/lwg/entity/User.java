@@ -58,6 +58,19 @@ public class User {
      */
     private LocalDateTime updateTime;
 
+    /**
+     * 信誉值
+     */
+    private Integer reputation;
+
+    public Integer getReputation() {
+        return reputation;
+    }
+
+    public void setReputation(Integer reputation) {
+        this.reputation = reputation;
+    }
+
     public Long getId() {
         return id;
     }

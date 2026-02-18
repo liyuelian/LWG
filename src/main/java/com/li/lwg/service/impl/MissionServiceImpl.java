@@ -5,7 +5,9 @@ import com.li.lwg.dto.MissionPublishReq;
 import com.li.lwg.dto.MissionQueryReq;
 import com.li.lwg.dto.MissionSubmitReq;
 import com.li.lwg.dto.MissionAuditReq;
+import com.li.lwg.dto.MissionSettledMsg;
 import com.li.lwg.enums.AssetType;
+import com.li.lwg.enums.MissionDifficultyEnum;
 import com.li.lwg.enums.RealmEnum;
 import com.li.lwg.enums.TransactionType;
 import com.li.lwg.entity.Mission;
@@ -17,10 +19,13 @@ import com.li.lwg.mapper.TransactionLogMapper;
 import com.li.lwg.mapper.UserMapper;
 import com.li.lwg.service.MissionService;
 import jakarta.annotation.Resource;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -40,6 +45,11 @@ public class MissionServiceImpl implements MissionService {
     private TransactionLogMapper transactionLogMapper;
     @Resource
     private ObjectMapper objectMapper;
+    @Resource
+    private RabbitTemplate rabbitTemplate;
+
+    public static final String MISSION_TOPIC = "lwg.mission.exchange";
+    public static final String MISSION_ROUTING_KEY = "mission.settled";
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -271,6 +281,14 @@ public class MissionServiceImpl implements MissionService {
             // 3.3 更新任务状态 -> 3 (已完成)
             missionMapper.updateStatus(mission.getId(), 3);
 
+            // 3.4 注册事务回调,发送消息给mq，处理信誉值
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    sendMessage(mission, req.getPass());
+                }
+            });
+
         } else {
             // === 分支 B: 审核驳回 (打回重做) ===
 
@@ -284,5 +302,24 @@ public class MissionServiceImpl implements MissionService {
     @Override
     public List<Mission> getMyMissions(Long userId, Integer type) {
         return missionMapper.selectMyMissions(userId, type);
+    }
+
+    /**
+     * 发送消息给mq 处理用户信誉值
+     *
+     * @param mission 任务
+     * @param isPass 是否通过
+     */
+    private void sendMessage(Mission mission, boolean isPass) {
+        int difficulty = mission.getDifficulty() == null ?
+                MissionDifficultyEnum.SIMPLE.getCode() : mission.getDifficulty();
+        MissionSettledMsg msg = new MissionSettledMsg(
+                mission.getAcceptorId(),
+                isPass,
+                difficulty,
+                mission.getId()
+        );
+        // 发送给 "lwg.mission.exchange"，路由键 "mission.settled"
+        rabbitTemplate.convertAndSend(MISSION_TOPIC, MISSION_ROUTING_KEY, msg);
     }
 }

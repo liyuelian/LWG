@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.li.lwg.mapper.ReputationLogMapper">
+
+    <resultMap id="BaseResultMap" type="com.li.lwg.entity.ReputationLog">
+        <id property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="changeScore" column="change_score"/>
+        <result property="currentScore" column="current_score"/>
+        <result property="sourceType" column="source_type"/>
+        <result property="sourceId" column="source_id"/>
+        <result property="remark" column="remark"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.li.lwg.entity.ReputationLog"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO t_reputation_log
+        (user_id, change_score, current_score,
+         source_type, source_id, remark, create_time)
+        VALUES (#{userId}, #{changeScore}, #{currentScore}, #{sourceType},
+                #{sourceId}, #{remark}, #{createTime})
+    </insert>
+
+    <select id="countBySource" resultType="int">
+        SELECT count(*)
+        FROM t_reputation_log
+        WHERE source_id = #{sourceId}
+          AND source_type = #{sourceType}
+    </select>
+
+</mapper>

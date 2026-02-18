@@ -14,12 +14,13 @@
         <result column="version" property="version"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
+        <result column="reputation" property="reputation"/>
     </resultMap>
 
     <sql id="Base_Column_List">
         id
         ,username,password,realm,balance,
-        frozen_balance,status,version,create_time,update_time
+        frozen_balance,status,version,create_time,update_time,reputation
     </sql>
 
     <select id="selectById" resultMap="UserResultMap">
@@ -61,6 +62,12 @@
             update_time = NOW()
         WHERE id = #{userId}
           AND status = 1
+    </update>
+
+    <update id="updateReputation">
+        UPDATE t_user
+        SET reputation = #{reputation}
+        WHERE id = #{userId}
     </update>
 
 </mapper>
