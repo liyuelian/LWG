@@ -1,21 +1,27 @@
 # ============================================================================
-# LWG 灵务阁 · 本地/服务器容器编排
+# LWG 灵务阁 · 容器编排（基础文件：只描述「怎么跑」）
+#
+# 本文件刻意不写 build，只引用镜像；镜像从哪来由各环境用覆盖文件决定：
+#   本地开发  docker compose -f compose.yml -f compose.build.yml up -d --build
+#              （compose.build.yml 补上两个服务的 build 上下文，前端指向 ../lwg-ui）
+#   生产部署  docker compose -f compose.yml -f compose.prod.yml up -d
+#              （compose.prod.yml 指定 CI 推送到 ghcr.io 的不可变 tag 镜像）
+# 这样服务器上永远不会尝试本地构建——它上面也没有前端源码。
 #
 # 设计要点：
 #   1. 所有服务接入同一个 bridge 网络 lwg，容器之间用服务名互相解析。
 #      这也是生产形态：application-prod.yml 里的 DB_HOST/RABBITMQ_HOST
 #      默认就是 lwg-mysql / lwg-rabbitmq。
-#   2. mysql 与 rabbitmq 使用 external 网络加入而非在此定义容器——
+#   2. mysql 与 rabbitmq 使用外部容器加入网络而非在此定义——
 #      数据卷与现有数据完全不受编排影响，避免误删开发数据。
-#      首次使用需执行一次接入命令（见 deploy/README 或下方注释）：
+#      首次使用需执行一次接入命令：
 #        docker network create lwg
 #        docker network connect --alias lwg-mysql lwg mysql
 #        docker network connect --alias lwg-rabbitmq lwg rabbitmq
 #   3. 后端 8080 只绑定 127.0.0.1，仅站点端口对外，与生产暴露策略一致。
 #   4. lwg-frontend 是唯一对外的入口，同时承担 /api 反向代理。
 #
-# 对外端口由 .env 的 FRONTEND_PORT 控制，默认 8081（避开本机 5173/8080 与
-# 服务器上其它已占用端口）。
+# 对外端口由 .env 的 FRONTEND_PORT 控制，默认 8081。
 # ============================================================================
 
 name: lwg
@@ -24,12 +30,6 @@ services:
 
   # ---- 后端 ----
   lwg-backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        BUILD_IMAGE: ${BUILD_IMAGE:-maven:3.9.9-eclipse-temurin-17}
-        RUNTIME_IMAGE: ${RUNTIME_IMAGE:-eclipse-temurin:17-jre-jammy}
     image: ${BACKEND_IMAGE:-lwg-backend:local}
     container_name: lwg-backend
     restart: unless-stopped
@@ -64,12 +64,6 @@ services:
 
   # ---- 前端（唯一对外入口，兼 /api 反向代理）----
   lwg-frontend:
-    build:
-      context: ../lwg-ui
-      dockerfile: Dockerfile
-      args:
-        BUILD_IMAGE: ${FRONTEND_BUILD_IMAGE:-node:24-alpine}
-        RUNTIME_IMAGE: ${FRONTEND_RUNTIME_IMAGE:-nginx:alpine}
     image: ${FRONTEND_IMAGE:-lwg-frontend:local}
     container_name: lwg-frontend
     restart: unless-stopped
