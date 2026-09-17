@@ -1,0 +1,35 @@
+# ============================================================================
+# LWG 灵务阁 · 生产环境（服务器 Docker Compose）
+#
+# 生效方式：容器内由 SPRING_PROFILES_ACTIVE=prod 指定（见 compose.yml）。
+#
+# 设计要点：
+#   1. 主机名一律用 compose 服务名（lwg-mysql / lwg-rabbitmq），
+#      因为容器里的 localhost 指向容器自身，连不上数据库；
+#   2. DB_USERNAME / DB_PASSWORD **故意不设默认值**：忘记配置时应用启动即失败，
+#      而不是悄悄用上一组猜测的凭据连库——宁可启动失败，不要连错库；
+#   3. 表结构由 Flyway 管理（全新库），因此不需要 baseline-on-migrate。
+# ============================================================================
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:lwg-mysql}:${DB_PORT:3306}/${DB_NAME:lwg}?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:lwg-rabbitmq}
+    port: ${RABBITMQ_PORT:5672}
+
+  flyway:
+    # 生产为全新库，不需要 baseline；表结构完全由 V*.sql 演进
+    baseline-on-migrate: false
+    validate-on-migrate: true
+
+# 生产日志级别（注意：mybatis.configuration.log-impl: StdOutImpl 在公共配置里，
+# MyBatis 的 SQL 打印不受 logging.level 控制，如需在生产关闭 SQL 输出，
+# 应把 log-impl 拆到 application-dev.yml —— 属于后续独立改动）
+logging:
+  level:
+    root: info
+    com.li.lwg: info

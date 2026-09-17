@@ -1,36 +1,59 @@
+# ============================================================================
+# LWG 灵务阁 · 公共配置（与环境无关）
+#
+# profile 约定：
+#   dev  —— Mac 本地开发，连本机 MySQL/RabbitMQ 容器（默认值，本机无需加参数）
+#   prod —— 服务器容器环境，主机名走 compose 的服务名
+#
+# 切换方式：环境变量 SPRING_PROFILES_ACTIVE=prod
+# 凡是与部署环境相关的配置（数据源、MQ 主机）一律不放这里，见 application-dev.yml
+# 与 application-prod.yml。
+# ============================================================================
 server:
   port: 8080
 
 spring:
-  datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/lwg?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false
-    username: root
-    password: 123456
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: GMT+8
 
   rabbitmq:
-    # 基础连接信息
-    host: 127.0.0.1      # RabbitMQ 服务器地址
-    port: 5672           # 默认端口
-    username: admin      # 默认账号
-    password: admin123      # 默认密码
-    virtual-host: /      # 虚拟主机 (默认为 /)
-
+    # 主机与端口随环境变化，见各 profile 文件
+    username: ${RABBITMQ_USERNAME:admin}
+    password: ${RABBITMQ_PASSWORD:admin123}
+    virtual-host: /
     # 消息确认机制
     publisher-confirm-type: correlated  # 开启发送方确认 (ConfirmCallback)
     publisher-returns: true             # 开启发送方回退 (ReturnCallback)
-
     # 消费端配置
     listener:
       simple:
         acknowledge-mode: manual        # 开启手动ACK
         prefetch: 1                     # 每次只取 1 条
 
+  flyway:
+    # 迁移脚本位置 classpath:db/migration/V*.sql，两个环境都启用，
+    # 保证本地开发库与服务器库的表结构由同一套脚本演进
+    enabled: true
+    baseline-on-migrate: false
+    validate-on-migrate: true
+    locations: classpath:db/migration
+
 mybatis:
   mapper-locations: classpath:mapper/*.xml  # 指定 XML 文件的位置
   configuration:
     map-underscore-to-camel-case: true    # 开启驼峰映射 (user_id -> userId)
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 打印 SQL
+
+# 健康检查：供容器 HEALTHCHECK、compose depends_on 与 deploy.sh 探活使用
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always

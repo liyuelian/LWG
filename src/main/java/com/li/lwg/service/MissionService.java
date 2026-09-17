@@ -53,4 +53,11 @@ public interface MissionService {
      * @return 任务列表
      */
     List<Mission> getMyMissions(Long userId, Integer type);
+
+    /**
+     * 用户撤销任务
+     *
+     * @param req
+     */
+    void cancelMission(MissionCancelReq req);
 }

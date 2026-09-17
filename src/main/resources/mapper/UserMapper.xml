@@ -70,4 +70,13 @@
         WHERE id = #{userId}
     </update>
 
+    <update id="unfreezeBalance">
+        UPDATE t_user
+        SET balance        = balance + #{amount},
+            frozen_balance = frozen_balance - #{amount},
+            update_time    = NOW()
+        WHERE id = #{userId}
+          AND frozen_balance >= #{amount}
+    </update>
+
 </mapper>

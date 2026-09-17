@@ -1,0 +1,28 @@
+# ============================================================================
+# LWG 灵务阁 · 本地构建覆盖文件（Mac 开发机使用）
+#
+# 用法：
+#   docker compose -f compose.yml -f compose.build.yml up -d --build
+#
+# 本文件只做一件事：补上两个服务的 build 上下文，让本机可以自行构建镜像。
+# 生产环境不加载本文件，因此服务器永远不会尝试构建
+# （它上面也没有前端源码，前端是独立仓库）。
+#
+# 注意：本机 Docker Hub 若不可达，前端基础镜像 node:24-alpine / nginx:alpine
+# 可能拉不下来；后端基础镜像 maven:3.9.9-eclipse-temurin-17 与
+# eclipse-temurin:17-jre-jammy 通常已在本地缓存，可直接构建。
+# CI（GitHub Runner）网络正常，不受此限制。
+# ============================================================================
+
+services:
+
+  lwg-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+  lwg-frontend:
+    build:
+      # 前端是独立仓库，与本仓库同级
+      context: ../lwg-ui
+      dockerfile: Dockerfile

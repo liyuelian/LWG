@@ -5,6 +5,7 @@ import com.li.lwg.dto.*;
 import com.li.lwg.entity.Mission;
 import com.li.lwg.service.MissionService;
 import jakarta.annotation.Resource;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -79,5 +80,18 @@ public class MissionController {
             return Result.error("参数错误：type 必须为 1(发布) 或 2(接取)");
         }
         return Result.success(missionService.getMyMissions(userId, type));
+    }
+
+    /**
+     * 用户取消任务
+     *
+     * <p>注意用 @Valid 而非 @Validated：校验 @RequestBody 上的约束注解必须用
+     * jakarta.validation.Valid，@Validated 只对方法级/参数级校验（如 @RequestParam 上的
+     * 约束）生效，写在这里不产生任何校验行为。
+     */
+    @PostMapping("/cancel")
+    public Result<?> cancelMission(@RequestBody @Valid MissionCancelReq req) {
+        missionService.cancelMission(req);
+        return Result.success("撤榜成功，押金已退回灵脉");
     }
 }

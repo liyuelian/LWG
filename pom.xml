@@ -18,12 +18,23 @@
 		<java.version>17</java.version>
 	</properties>
 
+
 	<dependencies>
 
 		<!-- Web -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+
+		<!--
+		  参数校验：spring-boot-starter-web 本身不含 Bean Validation 实现，
+		  缺少本依赖时 @NotNull / @Size 等注解无法编译。
+		  引入后由 GlobalExceptionHandler 把校验失败转为可读的 400。
+		-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
 
 		<!-- MyBatis -->
@@ -62,6 +73,22 @@
 			<groupId>com.github.pagehelper</groupId>
 			<artifactId>pagehelper-spring-boot-starter</artifactId>
 			<version>1.4.7</version>
+		</dependency>
+
+		<!-- 数据库版本管理：随应用启动自动执行 db/migration 下的迁移脚本 -->
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-mysql</artifactId>
+		</dependency>
+
+		<!-- 健康检查：供容器 HEALTHCHECK、compose depends_on 与部署脚本探活 -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
 		</dependency>
 
 	</dependencies>

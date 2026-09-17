@@ -1,0 +1,164 @@
+# ============================================================================
+# LWG 灵务阁 · CD（把 CI 产物部署到阿里云服务器）
+#
+# 触发：backend-ci 成功结束后自动运行（或手动触发）。
+#
+# 为什么用 workflow_run 而不是直接监听 push：
+#   两个 workflow 若都监听 push，会**并行**启动。CD 会先于镜像构建完成就去拉
+#   ghcr.io/...:<sha>，必然拉不到而失败。workflow_run 保证镜像已推送后才部署。
+#   这正是本项目实测踩到的问题。
+#
+# 为什么用 SSH 而不是自托管 Runner：
+#   目标是"单台有公网 IP 的服务器"，SSH 方式无需在服务器上常驻 Runner 进程，
+#   也就不占那台 1.6G 内存机器的宝贵内存，且不需要额外的 token。
+#   详见 docs/deployment.md。
+#
+# 需要配置的仓库 Secret（Settings → Secrets and variables → Actions）：
+#   SERVER_HOST        服务器 IP，例如 8.163.86.86
+#   SERVER_USER        登录用户，例如 root
+#   SERVER_SSH_KEY     专用部署私钥（ed25519，对应公钥已装入服务器 authorized_keys）
+#   SERVER_PORT        可选，SSH 端口，默认 22
+#
+# 注意：GitHub 托管 Runner 来自公网任意地址，因此服务器安全组必须对公网
+#       放行该 SSH 端口；若只放行固定 IP，此 job 会连接失败。
+# ============================================================================
+name: backend-cd
+
+on:
+  # 仅在 CI 成功跑完之后部署，避免并行导致"镜像还没推上去就拉取"
+  workflow_run:
+    workflows: ["backend-ci"]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  # 同一分支的部署串行执行，避免两个部署同时改动容器
+  group: backend-cd-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DEPLOY_DIR: /opt/lwg
+  IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/lwg-backend
+
+jobs:
+  deploy:
+    name: 部署到阿里云
+    # workflow_run 触发时要确认上游 CI 是成功的；手动触发时该字段不存在
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # workflow_run 默认检出默认分支最新提交；显式指定为触发 CI 的那个提交，
+          # 保证"部署的编排文件"与"被测试、被构建的代码"是同一份
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      # 刻意使用原生命令而不是第三方 action：
+      #   * 失败时的报错是 ssh/scp 的原始输出，可直接定位（鉴权失败？超时？路径？）
+      #   * 少一层对第三方 action 版本行为的依赖
+      - name: 准备 SSH 密钥
+        env:
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          # 用 printf 写入并显式补尾换行：粘贴到 Secret 时末尾换行常被吞掉，
+          # 缺少换行会让 ssh 报 "invalid format"
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "密钥行数: $(wc -l < ~/.ssh/deploy_key)"
+          head -1 ~/.ssh/deploy_key | sed 's/\(.\{40\}\).*/\1.../'
+          # 校验私钥格式，格式错误时在这里就失败，而不是等到连接阶段
+          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null && echo "✓ 私钥格式有效"
+          echo "SSH_HOST=${{ secrets.SERVER_HOST }}" >> "$GITHUB_ENV"
+          echo "SSH_PORT=${{ secrets.SERVER_PORT || 22 }}" >> "$GITHUB_ENV"
+
+      - name: 测试 SSH 连通性
+        run: |
+          set -uo pipefail
+          # 注意：这里刻意不使用 bash 数组（如 SSH_OPTS=(...) 配 "${SSH_OPTS[@]}"）。
+          # 该写法在 CI 上曾导致数组展开失败，"-i" 被当作命令名执行，
+          # 报出误导性的 exit code 127（形似 ssh 不存在，实为脚本自身的问题）。
+          TARGET="${{ secrets.SERVER_USER }}@$SSH_HOST"
+          echo "目标: $TARGET:$SSH_PORT"
+          # -vv 抓取握手细节；失败时把输出写进 Step Summary，
+          # 便于在只有只读权限时定位问题（job 日志需仓库管理员权限才能下载）
+          if ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" \
+                 -o BatchMode=yes -o StrictHostKeyChecking=no \
+                 -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 \
+                 -o IdentitiesOnly=yes -vv \
+                 "$TARGET" 'echo connected' > /tmp/ssh.out 2>&1; then
+            echo "✓ SSH 连通"
+            grep -aE "Authenticated to|Server accepts key|Offering public key" /tmp/ssh.out | tail -3 || true
+          else
+            rc=$?
+            # 把 ssh 输出的关键行经 JSON 编码后放进注解：
+            # job 日志需仓库管理员权限，Step Summary 又无法通过 API 读取，
+            # 而 check-run 注解是公开可读的，因此用它把失败原因带出来。
+            detail="$(grep -aiE 'debug1: (Authenticat|Offering|Trying|Next auth)|Permission denied|Connection (timed out|refused|closed)|No route|Host key|invalid format|error' /tmp/ssh.out | tail -12)"
+            [ -z "$detail" ] && detail="$(tail -12 /tmp/ssh.out)"
+            encoded="$(printf '%s' "$detail" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')"
+            echo "::error::SSH 失败(rc=$rc)。详情: $encoded"
+            {
+              echo "### ❌ SSH 连通性测试失败（退出码 $rc）"
+              echo ""
+              echo "目标: \`$TARGET:$SSH_PORT\`"
+              echo ""
+              echo '```'
+              tail -60 /tmp/ssh.out
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            tail -25 /tmp/ssh.out
+            exit $rc
+          fi
+
+      - name: 上传编排文件与部署脚本
+        run: |
+          set -euo pipefail
+          scp -i ~/.ssh/deploy_key -P "$SSH_PORT" \
+            -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            compose.yml compose.prod.yml deploy.sh \
+            "${{ secrets.SERVER_USER }}@$SSH_HOST:/opt/lwg/"
+          echo "已上传，服务器侧文件："
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" -o BatchMode=yes \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SERVER_USER }}@$SSH_HOST" 'ls -la /opt/lwg/*.yml /opt/lwg/*.sh'
+
+      - name: 执行部署
+        env:
+          # 与被测试、被构建的提交保持一致
+          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # 前端：两个仓库各自 CI 只给本仓库的提交打 sha tag，后端提交的 sha
+          #       在前端仓库里不存在，硬用必然拉取失败，因此这里用 latest。
+          #       若配置了仓库变量 FRONTEND_IMAGE 则优先使用它（可固定版本）。
+          FRONTEND_REF: ${{ vars.FRONTEND_IMAGE || 'ghcr.io/liyuelian/lwg-frontend:latest' }}
+        run: |
+          set -euo pipefail
+          BACKEND_REF="ghcr.io/${{ github.repository_owner }}/lwg-backend:${DEPLOY_SHA}"
+          echo "部署后端: $BACKEND_REF"
+          echo "部署前端: $FRONTEND_REF"
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" \
+            -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SERVER_USER }}@$SSH_HOST" \
+            "cd /opt/lwg && chmod +x deploy.sh && BACKEND_IMAGE='$BACKEND_REF' FRONTEND_IMAGE='$FRONTEND_REF' ./deploy.sh"
+
+      - name: 核对线上版本
+        if: success()
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" \
+            -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            "${{ secrets.SERVER_USER }}@$SSH_HOST" \
+            'docker inspect lwg-backend --format "线上 revision={{index .Config.Labels \"org.opencontainers.image.revision\"}} image={{.Config.Image}} health={{.State.Health.Status}}"'
+
+      - name: 汇总
+        if: always()
+        run: |
+          {
+            echo "### 部署结果"
+            echo ""
+            echo "- 后端镜像: \`ghcr.io/${{ github.repository_owner }}/lwg-backend:${{ github.event.workflow_run.head_sha || github.sha }}\`（不可变 tag）"
+            echo "- 前端镜像: \`${{ vars.FRONTEND_IMAGE || 'ghcr.io/liyuelian/lwg-frontend:latest' }}\`"
+            echo "- 状态: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"

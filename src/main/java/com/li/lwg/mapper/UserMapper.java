@@ -63,4 +63,12 @@ public interface UserMapper {
      * @return 影响行数
      */
     int updateReputation(@Param("userId") Long userId, @Param("reputation") int reputation);
+
+    /**
+     * 解冻灵石：将冻结押金退回为可用灵石
+     * * @param userId 道友的ID
+     * @param amount 需要解冻的灵石数量
+     * @return 影响的行数 (返回 1 表示解冻成功，0 表示余额异常或用户不存在)
+     */
+    int unfreezeBalance(@Param("userId") Long userId, @Param("amount") Long amount);
 }

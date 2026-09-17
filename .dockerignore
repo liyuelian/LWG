@@ -1,0 +1,40 @@
+# ============================================================================
+# 构建上下文排除清单
+#
+# 只把构建真正需要的东西送进 Docker daemon：pom.xml、src、以及本文件。
+# target/ 尤其重要——排除后 build context 从上百 MB 降到几百 KB。
+# ============================================================================
+
+# 构建产物与本地仓库
+target/
+.mvn/wrapper/maven-wrapper.jar
+
+# 版本控制与 IDE
+.git/
+.gitignore
+.idea/
+.vscode/
+*.iml
+
+# 文档
+docs/
+AGENTS.md
+HELP.md
+README.md
+
+# 环境变量（含真实密码，绝不进镜像）
+.env
+.env.*
+!.env.example
+
+# Docker 自身
+Dockerfile
+.dockerignore
+compose*.yml
+
+# 测试（镜像构建不需要，测试由 CI 独立步骤负责）
+src/test/
+
+# 其他
+*.log
+.DS_Store

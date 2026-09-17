@@ -2,11 +2,13 @@ package com.li.lwg.service.impl;
 
 import com.li.lwg.dto.MissionAcceptReq;
 import com.li.lwg.dto.MissionPublishReq;
+import com.li.lwg.dto.MissionCancelReq;
 import com.li.lwg.dto.MissionQueryReq;
 import com.li.lwg.dto.MissionSubmitReq;
 import com.li.lwg.dto.MissionAuditReq;
 import com.li.lwg.dto.MissionSettledMsg;
 import com.li.lwg.enums.AssetType;
+import com.li.lwg.enums.MissionStatusEnum;
 import com.li.lwg.enums.MissionDifficultyEnum;
 import com.li.lwg.enums.RealmEnum;
 import com.li.lwg.enums.TransactionType;
@@ -321,5 +323,75 @@ public class MissionServiceImpl implements MissionService {
         );
         // 发送给 "lwg.mission.exchange"，路由键 "mission.settled"
         rabbitTemplate.convertAndSend(MISSION_TOPIC, MISSION_ROUTING_KEY, msg);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelMission(MissionCancelReq req) {
+        // 1. 查询任务并加悲观锁，防止同时并发接单
+        Mission mission = missionMapper.selectMissionForUpdate(req.getMissionId());
+
+        if (mission == null) {
+            throw new ServiceException("任务不存在");
+        }
+        if (!mission.getPublisherId().equals(req.getUserId())) {
+            throw new ServiceException("无权越俎代庖，撤销他人任务");
+        }
+        // 只有待接单状态才能撤销
+        if (!MissionStatusEnum.PENDING_ACCEPT.getCode().equals(mission.getStatus())) {
+            throw new ServiceException("任务已被接取或状态已变更，天道契约不可违！");
+        }
+
+        // 2. 修改任务状态为 4 (已取消)，并记录原因
+        Mission cancelMission = new Mission();
+        cancelMission.setId(mission.getId());
+        cancelMission.setStatus(MissionStatusEnum.CANCELLED.getCode());
+        cancelMission.setCancelReason(req.getCancelReason());
+        cancelMission.setUpdateTime(LocalDateTime.now());
+        // Mapper 里带了 AND status = 0 守卫，非 0 行说明状态在锁定后被改动，必须终止
+        if (missionMapper.updateCancelInfo(cancelMission) == 0) {
+            throw new ServiceException("取消失败：任务状态已变更，请刷新后重试");
+        }
+
+        // 3. 解冻灵石，退回可用余额
+        int row = userMapper.unfreezeBalance(req.getUserId(), mission.getReward());
+        if (row == 0) {
+            throw new ServiceException("灵石解冻失败，请重试取消");
+        }
+
+        // 解冻后重新查询，取两个钱包的最新快照写入流水。
+        // balance_after 在 t_transaction_log 中是 NOT NULL，不写会直接抛
+        // "Column 'balance_after' cannot be null"，与发布/结算链路的做法保持一致。
+        User publisher = userMapper.selectById(req.getUserId());
+
+        // 4. 记录资金流水明细
+        // 两条流水共用同一个单号，与发布/结算链路的做法保持一致，便于对账时关联一进一出
+        String orderNo = UUID.randomUUID().toString();
+
+        // 4.1 冻结账户流水 (解除冻结，记为负数)
+        TransactionLog frozenLog = new TransactionLog();
+        frozenLog.setUserId(req.getUserId());
+        frozenLog.setMissionId(mission.getId());
+        frozenLog.setOrderNo(orderNo);
+        frozenLog.setType(TransactionType.REFUND.getCode()); // 4: 悬赏退回
+        frozenLog.setAmount(-mission.getReward()); // 冻结金额减少，用负数
+        frozenLog.setAssetType(AssetType.FROZEN.getCode()); // 2: 冻结账户
+        frozenLog.setBalanceAfter(publisher.getFrozenBalance()); // 记录【冻结余额】快照
+        frozenLog.setRemark("撤消任务 #" + mission.getId() + " 解除冻结押金");
+        frozenLog.setCreateTime(LocalDateTime.now());
+        transactionLogMapper.insert(frozenLog); // 直接调用你已有的 insert 方法
+
+        // 4.2 可用账户流水 (押金退回，记为正数)
+        TransactionLog availableLog = new TransactionLog();
+        availableLog.setUserId(req.getUserId());
+        availableLog.setMissionId(mission.getId());
+        availableLog.setOrderNo(orderNo);
+        availableLog.setType(TransactionType.REFUND.getCode());
+        availableLog.setAmount(mission.getReward()); // 可用金额增加，用正数
+        availableLog.setAssetType(AssetType.AVAILABLE.getCode()); // 1: 可用账户
+        availableLog.setBalanceAfter(publisher.getBalance()); // 记录【可用余额】快照
+        availableLog.setRemark("撤消任务 #" + mission.getId() + " 押金退回可用");
+        availableLog.setCreateTime(LocalDateTime.now());
+        transactionLogMapper.insert(availableLog);
     }
 }

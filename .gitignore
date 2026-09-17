@@ -4,6 +4,11 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+### 环境变量（数据库/MQ 密码，禁止入库）###
+.env
+.env.local
+.env.*.local
+
 ### STS ###
 .apt_generated
 .classpath

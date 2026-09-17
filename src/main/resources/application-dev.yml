@@ -1,0 +1,39 @@
+# ============================================================================
+# LWG 灵务阁 · 本地开发环境（Mac + OrbStack 容器）
+#
+# 生效方式：默认 profile，直接 mvn spring-boot:run 即可，无需额外参数。
+# 依赖：本机 MySQL(3306) 与 RabbitMQ(5672) 容器（OrbStack 中的 mysql / rabbitmq）。
+# 所有可覆盖的变量名见根目录 .env.example。
+#
+# 注意：这里的默认值只是为了本机开箱即用（端口/密码都是本机容器约定），
+#       生产环境不允许出现任何默认值，见 application-prod.yml。
+# ============================================================================
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # allowPublicKeyRetrieval=true：MySQL 8.0+ 默认 caching_sha2_password 认证，
+    # 在 useSSL=false 时必须显式允许取回公钥，否则报
+    # "Public Key Retrieval is not allowed" 导致首个请求 500
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:lwg}?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+
+  flyway:
+    # 只为本地开发打开：Mac 上的 lwg 库是先有表、后引入 Flyway 的，
+    # 没有 flyway_schema_history 且 schema 非空，必须先 baseline 才能启动。
+    # baseline 只建立"版本起点"记录，不会改动任何已有表结构。
+    # 不指定 baseline-version，即取默认值 1 —— 语义是"这个库已经等价于 V1 的结构"，
+    # 因此不会重复执行 V1；全新库（生产 / CI Testcontainers）schema 为空，
+    # 走不到 baseline 分支，会正常执行 V1 建表。
+    # 生产环境刻意保持 application.yml 里的 baseline-on-migrate: false，
+    # 避免误连已有库时静默跳过迁移。
+    baseline-on-migrate: true
+
+# 本地开发日志级别（SQL 由公共配置的 mybatis log-impl: StdOutImpl 打印）
+logging:
+  level:
+    com.li.lwg: debug

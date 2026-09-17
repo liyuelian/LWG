@@ -74,4 +74,18 @@ public interface MissionMapper {
      * @return 任务列表
      */
     List<Mission> selectMyMissions(@Param("userId") Long userId, @Param("type") Integer type);
+
+    /**
+     * 加悲观锁查询榜文 (防止并发接单/撤销)
+     *
+     * @param id 任务ID
+     */
+    Mission selectMissionForUpdate(@Param("id") Long id);
+
+    /**
+     * 撤销榜文：仅更新状态、原因和时间
+     * @param mission
+     * @return
+     */
+    int updateCancelInfo(Mission mission);
 }

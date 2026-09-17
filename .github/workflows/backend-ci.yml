@@ -1,0 +1,121 @@
+# ============================================================================
+# LWG 灵务阁 · 后端 CI
+#
+# 触发：推送到 master、对 master 的 PR、以及手动触发。
+#
+# 两个 job：
+#   test  —— 跑 Maven 测试。测试用 Testcontainers 临时启动 MySQL/RabbitMQ，
+#            GitHub 的 ubuntu-latest runner 自带 Docker，因此无需任何外部依赖，
+#            也不会碰任何人的本地数据库。
+#   build —— 仅在 push 时构建并推送镜像到 ghcr.io。
+#            打两个 tag：commit sha（不可变，用于回滚）与 latest（便于取最新）。
+#
+# 镜像地址：ghcr.io/<owner>/lwg-backend
+# 鉴权使用内置 GITHUB_TOKEN，无需额外配置 Secrets。
+# ============================================================================
+name: backend-ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+# 同一分支的重复推送取消已在跑的流水线，避免浪费额度
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/lwg-backend
+
+jobs:
+  # ---------------- 测试 ----------------
+  test:
+    name: 测试（Testcontainers）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: 打印环境信息
+        run: |
+          java -version
+          mvn -v
+          docker version
+
+      # Testcontainers 使用默认的 mysql:8.4 / rabbitmq:3.13 官方镜像，
+      # runner 网络正常无需覆盖镜像；本机 Docker Hub 不可达时才需要覆盖。
+      - name: 运行测试
+        run: mvn -B -ntp verify
+
+      - name: 上传测试报告（失败时便于排查）
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: target/surefire-reports/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ---------------- 构建并推送镜像 ----------------
+  build:
+    name: 构建镜像并推送
+    needs: test
+    # 推送到 master 或手动触发时都构建镜像：
+    # PR 不构建（避免给未合并的代码发布镜像），手动触发则便于重发镜像或演练回滚
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 配置 Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 生成镜像标签与注解
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,format=long,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: 构建并推送
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # 把提交号与流水线编号写进镜像标签，部署后可用 docker inspect 核对线上版本
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ github.run_number }}
+          # 让后续构建复用依赖层，显著缩短时间
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: 输出镜像信息
+        run: |
+          echo "已推送镜像：" 
+          echo "${{ steps.meta.outputs.tags }}"

@@ -1,0 +1,42 @@
+# ============================================================================
+# LWG 灵务阁 · 生产部署覆盖文件（服务器上使用）
+#
+# 用法：
+#   docker compose -f compose.yml -f compose.prod.yml up -d
+#
+# 与基础文件的三点差别：
+#   1. 镜像来自 CI 推送到 ghcr.io 的产物。基础文件默认的本地 tag
+#      （lwg-backend:local / lwg-frontend:local）在服务器上并不存在。
+#   2. tag 使用具体的 commit sha（不可变），而不是浮动的 latest，
+#      这样回滚只需换回上一个 sha，行为可预期。
+#   3. pull_policy: always 保证每次都真正去仓库取指定 tag，
+#      避免本地缓存了旧镜像却以为部署成功。
+#
+# 由 deploy.sh 注入的变量：
+#   BACKEND_IMAGE   ghcr.io/liyuelian/lwg-backend:<sha>
+#                   —— 前端与后端是两个独立仓库，各自 CI 只给本仓库的提交打 sha tag，
+#                      因此前端无法用后端的 sha 去拉取。前端镜像目前只有 latest，
+#                      为可变 tag（已知限制，见 docs/deployment.md）。
+#                      若要固定前端版本，把 FRONTEND_IMAGE 显式传给 deploy.sh，
+#                      并确保该 tag 确实存在。
+#   FRONTEND_IMAGE  缺省回退到 latest，保证部署不会因为缺变量而直接失败
+# 两者都不设默认值时 compose 会报错；这里刻意保留 :? 校验以免误用本地 tag。
+# ============================================================================
+
+services:
+
+  lwg-backend:
+    image: ${BACKEND_IMAGE:?生产部署必须指定 BACKEND_IMAGE，形如 ghcr.io/<owner>/lwg-backend:<sha>}
+    # 拉取策略可被覆盖：正常部署用 always（确保真的取到该 tag 的最新内容），
+    # 回滚时由 deploy.sh 设为 never —— 回滚用的是本地已存在的镜像，
+    # 若仍强行 pull，compose 会去仓库找那个仅存在于本地的 tag 而报 403，
+    # 导致回滚本身失败（该缺陷已在实测中复现）。
+    pull_policy: ${PULL_POLICY:-always}
+    environment:
+      # JVM 参数可被外部覆盖（与 deploy.sh 的变量优先级配合），默认值针对服务器内存收紧：
+      # 1.6G 内存下限制堆与元空间，并在 OOM 时快速退出交由 restart 策略处理
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=70 -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Djava.net.preferIPv4Stack=true -Duser.timezone=Asia/Shanghai}
+
+  lwg-frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/liyuelian/lwg-frontend:latest}
+    pull_policy: ${PULL_POLICY:-always}

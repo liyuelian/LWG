@@ -118,4 +118,22 @@
         </if>
         ORDER BY create_time DESC
     </select>
+
+
+    <select id="selectMissionForUpdate" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List"/>
+        FROM t_mission
+        WHERE id = #{id}
+        FOR UPDATE
+    </select>
+
+    <update id="updateCancelInfo">
+        UPDATE t_mission
+        SET status        = #{status},
+            cancel_reason = #{cancelReason},
+            update_time   = #{updateTime}
+        WHERE id = #{id}
+          AND status = 0
+    </update>
 </mapper>
