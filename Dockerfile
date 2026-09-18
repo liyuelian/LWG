@@ -23,6 +23,15 @@ RUN mvn -B -q clean package -DskipTests
 
 # ---------- 运行阶段 ----------
 FROM eclipse-temurin:17-jre-jammy
+
+# 构建信息写入 OCI 标准标签：部署后可用 docker inspect 直接确认"线上跑的是哪个提交"，
+# 无需登录服务器翻日志。由 CI 通过 --build-arg 传入（见 build-push-action 的 build-args）。
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
+LABEL org.opencontainers.image.revision="${GIT_COMMIT}" \
+      org.opencontainers.image.created="${BUILD_TIME}" \
+      org.opencontainers.image.title="lwg-backend" \
+      org.opencontainers.image.description="LWG 灵务阁后端"
 # HEALTHCHECK 需要 curl 访问 actuator；顺带清理 apt 缓存减小体积
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl \

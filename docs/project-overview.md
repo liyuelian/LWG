@@ -28,6 +28,7 @@ LWG 是一个模拟“宗门任务大厅”的单模块 Spring Boot 项目，主
 | `docs/change-log.md` | 分析、文档、代码改动记录 |
 | `docs/codex-guide.md` | Codex 协作开发规则 |
 | `docs/cicd-guide.md` | GitHub CI/CD 原理与接入说明 |
+| `docs/deployment.md` | 阿里云生产环境的部署形态、资源限额、部署流程与排查 |
 
 ## 3. 模块划分
 
