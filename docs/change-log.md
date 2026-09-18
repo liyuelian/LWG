@@ -4,6 +4,63 @@
 
 ## 2026-09-17
 
+### 部署：阶段 5 完成阿里云生产部署
+
+改动目的：把应用真正部署到阿里云服务器，验证 CI 产物可运行、并建立可回滚的部署流程。
+
+服务器侧准备（均为实测）：
+
+- 配置 `/etc/docker/daemon.json` 镜像加速器（服务器直连 Docker Hub 超时；`ghcr.io` 可直连）；
+- 新增 `/swapfile2`（2G，写入 fstab）并把 `vm.swappiness` 设为 10，**总 swap 6G**；
+- 创建 `lwg` bridge 网络与 `/opt/lwg` 部署目录；
+- 生成 `/opt/lwg/.env`（随机 24 位密码，权限 600，不入库）；
+- 用 `docker run` 创建两个数据容器（**刻意不交给 compose 管理，保护数据卷**）：
+  `lwg-mysql`（MySQL 8.4.11，320M 限额，数据落 `/opt/lwg/data/mysql`）、
+  `lwg-rabbitmq`（3.13，192M 限额，未启用管理插件）。
+
+仓库新增文件：
+
+| 文件 | 作用 |
+| --- | --- |
+| `deploy.sh` | 部署脚本：校验环境 → 记录回滚点 → 拉镜像（失败重试 3 次）→ 起容器 → 轮询健康检查 → 失败自动回滚 |
+| `docs/deployment.md` | 服务器构成、资源限额、部署流程、已知坑与排查方法 |
+| `.env.example` | 补充 `BACKEND_IMAGE` / `FRONTEND_IMAGE` 两个变量 |
+
+验证（均为实测）：
+
+- `deploy.sh` 执行**退出码 0**；四个容器全部 healthy，`RestartCount=0`、`OOMKilled=false`、dmesg 无 OOM 记录；
+- **Flyway 在全新生产库正确执行迁移**：`<< Empty Schema >>` → `Migrating to version "1 - init schema"` → `now at version v1`，四张业务表建出；
+- 后端以 **prod profile** 连接 `lwg-mysql`（MySQL **8.4**，与本地 9.2 不同版本，迁移脚本两边均通过），启动耗时 8.3s；
+- 经 nginx 走完整链路（nginx → backend → mysql）验证 `/api/user/info`、`/api/mission/list`、财务与信誉接口均返回 200；
+- 站点端口探活 `http://127.0.0.1:8081/actuator/health` → 200；
+- 内存占用实测：backend 221M / mysql 214M / rabbitmq 115M / frontend 6M，合计约 556M，服务器可用 482M。
+
+过程中发现并修复的问题：
+
+1. **拉取 ghcr.io 镜像卡死**：首次部署卡了 10 分钟。排查发现 CDN 把某个层（30.9MB）调度到极慢节点——实测同一层出现 `18KB/s` 与 `11MB/s` 两种速度，节点从 `ghcrblobs18` 换到 `ghcrblobs10` 即恢复。据此给 `deploy.sh` 加了拉取重试（`PULL_RETRIES`，递增退避）。
+2. **`.env` 缺镜像变量**：首次部署是手动传入 `BACKEND_IMAGE`/`FRONTEND_IMAGE`，无人值守时会失败。已补入服务器 `.env` 与仓库模板，并**重跑一次不带环境变量的 `deploy.sh` 验证退出码 0**。
+
+数据状态：生产库 `t_user` 有 2 条记录（为端到端验证而建，id=1 发布者_老祖 / id=2 接单者_张三），其余三张业务表为空。
+
+### 修正：为初始资金补记流水（我重复犯了同一错误）
+
+创建测试用户时直接 `INSERT` 了 `balance`（100000 / 20000）却**未写对应的资金流水**，
+导致财务对账页 `totalIncome=0` 而余额 10 万，无法解释来源；对账检查直接报「不平」
+（余额 100000 vs 可用钱包流水净额 0）。
+
+已补记两条 `type=5`（灵石充值）流水，`balance_after` 分别为 100000 / 20000。
+修复后：两个用户对账均为「平」，`frozen_balance` 合计与待结算赏金合计均为 0，
+财务概览接口返回 `totalIncome: 100000`。
+
+**这是本项目第二次犯同一个错误**——开发阶段曾用近似对账等式清理流水导致误删
+（见本文档前文的「事故记录」）。两次的根因相同：**以 SQL 直接改动余额时忽略了流水**。
+已把「注入余额必须同时写充值流水」写入 `docs/deployment.md` 作为固化规范。
+
+未完成（需人工操作）：
+
+- **安全组放行 8081/TCP** —— 当前公网访问返回 `HTTP 000`，服务器侧已监听 `0.0.0.0:8081`；
+- **自托管 Runner 注册** —— 需要 GitHub token，沙箱无法读取 macOS Keychain（实测报 `-67674`）。
+
 ### 数据：清空开发库业务数据（仅保留 t_user）
 
 改动目的：在一次失误的流水清理之后（经过见下），为得到可验证的一致基线，按用户要求清空业务数据、只保留用户表。
