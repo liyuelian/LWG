@@ -4,6 +4,41 @@
 
 ## 2026-09-19
 
+### CI/CD：全链路打通（push → 测试 → 构建 → 自动部署）
+
+改动目的：此前 CI 已能自动测试与推送镜像，但部署仍需人工 SSH 上服务器执行 `deploy.sh`。本次把最后一段接上。
+
+方案选择：**GitHub 托管 Runner 通过 SSH 部署**，而不是在服务器上装自托管 Runner。理由：目标是单台有公网 IP 的服务器，SSH 方式无需常驻进程，不占那台 1.6G 内存机器的资源，也不需要额外的 GitHub token。
+
+落地要点：
+
+- `.github/workflows/backend-cd.yml`：由 `backend-ci` 成功后触发（`workflow_run`），用**原生 ssh/scp** 执行部署（此前用第三方 action，失败时无法定位原因）；
+- `deploy.sh`：新增参数快照机制（`deploy.state`），回滚时使用**上一次成功部署的参数**而非失败那次的参数；
+- `.github/scripts`：无；
+- 服务器侧：新增专用部署密钥 `github-actions-deploy2@lwg`（公钥入 `authorized_keys`，与个人密钥并列，便于单独撤销）。
+
+### 排查过程中定位并修复的 4 个缺陷（均由受控测试暴露）
+
+1. **`source .env` 无条件覆盖外部变量** —— 导致从命令行/CI 指定的镜像 sha 被 `.env` 里的 `latest` 冲掉，"指定版本部署"静默失效；
+2. **`docker compose --env-file` 同样覆盖 shell 变量** —— 更隐蔽的同类问题；改为把 `.env` 读进 shell 环境后再交给 compose；
+3. **回滚时 `pull_policy: always`** —— 回滚用的是本地 retag 出来的镜像，强行 pull 会去仓库找只存在于本地的 tag 而报 403，**回滚本身失败**；改为 `pull_policy` 可覆盖，回滚时设 `never`；
+4. **回滚沿用失败那次的运行参数** —— 实测注入 `JAVA_OPTS=-Xmx1k` 后健康检查失败，回滚时旧镜像配上同一参数同样起不来，**生产服务真的中断**（已用默认参数恢复）。由此引入参数快照。
+
+另有两个**脚本自身**的错误：
+
+- 使用 bash 数组 `SSH_OPTS=(...)` 配 `"${SSH_OPTS[@]}"`，在 CI 上数组展开失败，`-i` 被当作命令名执行，报出误导性的 exit 127（形似 ssh 不存在）；改为直接传参；
+- OpenSSH 私钥**缺少末尾换行会完全失效**（报 `invalid format` → `Permission denied`），已实测确认；Secret 存法改为 base64 单行以彻底规避换行/CRLF 损坏。
+
+### 验证（均为实测）
+
+- 触发 `backend-cd`（workflow_dispatch）后，服务器上实际运行的版本与仓库 HEAD **完全一致**：
+  `docker inspect lwg-backend` → `org.opencontainers.image.revision = 7b37d696d0d026e37e5ec55b1050bd1aea1804dc`，镜像 tag 即该 sha（不可变、可回滚）；
+- 四个容器全部 healthy，后端 `RestartCount=0`；
+- 公网链路：首页 200、`/api/user/info` 返回正常、`/actuator/health` 为 UP；
+- 部署未影响数据：`t_user` 2 条、`t_transaction_log` 3 条，余额与流水一致；
+- 资源占用：backend 216M / mysql 70M / rabbitmq 48M / frontend 10M，均在限额内，无 OOM。
+
+
 ### 代码（前端仓库 lwg-ui）：按 `frontend-redesign.md` 完成视觉与交互改版
 
 改动目的：落地 `docs/frontend-redesign.md` 的规格——**宣纸水墨打底 + 天道碑局部暗色**，并修掉该文档第 1 节列出的三个基础问题（外链字体不可达、Element 默认蓝与主色打架、`index.html` 三件小事）。
