@@ -63,14 +63,41 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          # 用 printf 写入并显式补尾换行：粘贴到 Secret 时末尾换行常被吞掉，
-          # 缺少换行会让 ssh 报 "invalid format"
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+
+          # 写入方式按内容自动判断，兼容两种 Secret 存法：
+          #   1) base64：本地 `base64 -i ~/.ssh/id_rsa | pbcopy` 后整段粘贴。
+          #      单行（或按 76 列折行）都不影响——下面会先去掉所有空白再解码。
+          #      推荐这种：不含原始换行，粘贴过程不可能损坏。
+          #   2) 原始私钥多行文本：保留兼容。
+          if printf '%s' "$SSH_KEY" | tr -d '[:space:]' | base64 -d > /tmp/key.try 2>/dev/null \
+             && grep -q 'PRIVATE KEY' /tmp/key.try; then
+            echo "检测到 base64 编码的密钥，已解码"
+            mv /tmp/key.try ~/.ssh/deploy_key
+          else
+            echo "按原始私钥文本处理"
+            rm -f /tmp/key.try
+            printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          fi
+          # 去掉可能被粘贴进来的 CRLF：\r 会让 OpenSSH 解析失败，
+          # 表现为 Load key "…": error in libcrypto
+          if grep -q $'\r' ~/.ssh/deploy_key; then
+            echo "检测到 CRLF，已转换为 LF"
+            tr -d '\r' < ~/.ssh/deploy_key > ~/.ssh/deploy_key.lf
+            mv ~/.ssh/deploy_key.lf ~/.ssh/deploy_key
+          fi
           chmod 600 ~/.ssh/deploy_key
+
           echo "密钥行数: $(wc -l < ~/.ssh/deploy_key)"
           head -1 ~/.ssh/deploy_key | sed 's/\(.\{40\}\).*/\1.../'
-          # 校验私钥格式，格式错误时在这里就失败，而不是等到连接阶段
-          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null && echo "✓ 私钥格式有效"
+          # 校验私钥：-P '' 让带密码的密钥在这里明确失败，
+          # 而不是留到 ssh 连接阶段报含糊的 libcrypto 错误
+          if ! ssh-keygen -y -P '' -f ~/.ssh/deploy_key > /dev/null 2>&1; then
+            echo "::error::密钥校验失败：不是合法私钥，或带密码（CI 无法交互输入密码）。"
+            echo "::error::建议改用 base64 存放：本地执行 base64 -i ~/.ssh/id_rsa | pbcopy，整段覆盖 SERVER_SSH_KEY。"
+            exit 1
+          fi
+          echo "✓ 私钥格式有效（未加密）"
+          echo "密钥指纹: $(ssh-keygen -l -f ~/.ssh/deploy_key | awk '{print $2}')"
           echo "SSH_HOST=${{ secrets.SERVER_HOST }}" >> "$GITHUB_ENV"
           echo "SSH_PORT=${{ secrets.SERVER_PORT || 22 }}" >> "$GITHUB_ENV"
 

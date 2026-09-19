@@ -1,0 +1,74 @@
+# ============================================================================
+# 临时诊断：SERVER_SSH_KEY 内容与格式体检
+#
+# 背景：backend-cd 的「准备 SSH 密钥」步骤通过（ssh-keygen -y 校验成功），
+#       但「测试 SSH 连通性」报 Load key: error in libcrypto。
+#       即：密钥文件是合法私钥，却在 ssh 加载阶段被 crypto 库拒绝。
+#
+# 本工作流只输出**非机密**的元数据：首行类型、行数、指纹、是否有 CRLF、
+# 是否加密、以及最终 ssh 加载试试的原始报错。不打印任何密钥内容。
+#
+# 用法：Actions → ssh-key-diagnose → Run workflow（只读，不改服务器任何东西）
+# 用完请删除本文件。
+# ============================================================================
+name: ssh-key-diagnose
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    name: 体检 SERVER_SSH_KEY
+    runs-on: ubuntu-latest
+    steps:
+      - name: 写入密钥并采集元数据
+        env:
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          set -uo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          {
+            echo "## SSH 密钥体检"
+            echo ""
+            echo "- 运行器 ssh 版本: \`$(ssh -V 2>&1)\`"
+            echo "- 密钥总行数: $(wc -l < ~/.ssh/deploy_key)"
+            echo "- 密钥字节数: $(wc -c < ~/.ssh/deploy_key)"
+            echo "- 首行: \`$(head -1 ~/.ssh/deploy_key)\`"
+            echo "- 末行: \`$(tail -1 ~/.ssh/deploy_key)\`"
+            echo "- 含 CR(\\r) 行数: $(grep -c $'\r' ~/.ssh/deploy_key || true)（>0 说明换行被写成 CRLF）"
+            echo "- 空行数: $(grep -c '^$' ~/.ssh/deploy_key || true)"
+            echo ""
+            echo "### 是否加密"
+            if grep -q "ENCRYPTED" ~/.ssh/deploy_key; then
+              echo "- 检测到传统 PEM 加密标记（Proc-Type: 4,ENCRYPTED）→ **密钥带密码，CI 无法使用**"
+            else
+              echo "- 未发现传统 PEM 加密标记"
+            fi
+            if ssh-keygen -y -P '' -f ~/.ssh/deploy_key >/dev/null 2>&1; then
+              echo "- \`ssh-keygen -y -P ''\` 通过 → **密钥未加密**"
+            else
+              echo "- \`ssh-keygen -y -P ''\` 失败 → 可能带密码，或格式异常"
+            fi
+            echo ""
+            echo "### 指纹（公开信息，可与本地 ssh-keygen -l -f 的结果比对）"
+            echo '```'
+            ssh-keygen -l -f ~/.ssh/deploy_key 2>&1 || true
+            echo '```'
+            echo ""
+            echo "### 与本地 ~/.ssh/id_rsa 的期望指纹比对"
+            echo "本地为: \`4096 SHA256:hYNXWIcwt871xKp5sy/PQDBznkF5IpnwH299lHvqYbE liyuelian.ke@outlook.com (RSA)\`"
+            echo "若上面指纹与此**不一致**，说明 Secret 里放的不是这把钥匙（或不是同一份内容）。"
+            echo ""
+            echo "### ssh 加载试探（复现 CD 的报错）"
+            echo '```'
+            ssh -i ~/.ssh/deploy_key -p 1 \
+                -o BatchMode=yes -o StrictHostKeyChecking=no \
+                -o UserKnownHostsFile=/dev/null -o ConnectTimeout=3 \
+                -o IdentitiesOnly=yes -v \
+                nobody@127.0.0.1 true 2>&1 \
+              | grep -aiE "key type|Load key|libcrypto|invalid format|Connection refused|Permission denied" | head -8 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
