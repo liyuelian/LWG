@@ -22,6 +22,11 @@ spring:
     host: ${RABBITMQ_HOST:127.0.0.1}
     port: ${RABBITMQ_PORT:5672}
 
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+
   flyway:
     # 只为本地开发打开：Mac 上的 lwg 库是先有表、后引入 Flyway 的，
     # 没有 flyway_schema_history 且 schema 非空，必须先 baseline 才能启动。

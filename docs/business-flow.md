@@ -200,3 +200,21 @@ UserController.getMyReputationLogs
 - 查询筛选：`MissionQueryReq`、`TransactionPageReq`、`MissionMapper.xml`、`TransactionLogMapper.xml`。
 - 用户身份：当前多数接口从请求参数传 `userId`，后续接登录态时会影响 Controller 和 Service。
 
+## 9. 天道碑排行榜
+
+入口：`GET /api/rank/board`，`RankController.getBoard`。
+
+```text
+RankController.getBoard
+-> RankServiceImpl.getBoard
+-> RankIndex (Redis ZSET 前 N 名、人数和个人名次)
+-> RankMapper.selectProfiles (MySQL 道号和境界)
+```
+
+- 信誉榜按正常账号当前信誉排名；空值按 6000 处理。
+- 悬赏完成榜只累计接单者已验收完成的任务（status = 3），至少完成一单才上榜。
+- 同分并列（1、1、3），同分用户按 ID 升序展示，默认前 50 位。
+- 个人名次按全榜计算；正常查询不扫描整个 MySQL 任务表。
+- `RankIndex.rebuild` 启动及每日校准从 MySQL 重建 Redis 投影。
+- `MissionServiceImpl.auditMission` 的数据库事务提交后更新 Redis 完成榜；`ReputationListener.handleMessage` 的数据库事务提交后更新 Redis 信誉榜。
+- 结构、接口契约、迁移及验证说明见 [ranking.md](ranking.md)。

@@ -14,6 +14,9 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import com.li.lwg.service.impl.RankIndex;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -32,6 +35,8 @@ public class ReputationListener {
     private UserMapper userMapper;
     @Resource
     private ReputationLogMapper reputationLogMapper;
+    @Resource
+    private RankIndex rankIndex;
 
     /**
      * 信誉队列
@@ -109,6 +114,17 @@ public class ReputationListener {
             logEntry.setRemark(remark);
             logEntry.setCreateTime(LocalDateTime.now());
             reputationLogMapper.insert(logEntry);
+
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        rankIndex.refreshReputation(userId);
+                    } catch (Exception e) {
+                        log.error("信誉榜更新失败，userId={}", userId, e);
+                    }
+                }
+            });
 
             log.info("[处理完成] 用户[{}] 变动[{}] 当前信誉值[{}]", userId, change, newRep);
 

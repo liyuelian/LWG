@@ -56,6 +56,7 @@ lwg.reputation.queue
 MissionServiceImpl.auditMission
 -> TransactionSynchronizationManager.registerSynchronization
 -> afterCommit
+-> RankIndex.refreshCompleted (Redis 完成榜)
 -> MissionServiceImpl.sendMessage
 -> RabbitTemplate.convertAndSend
 ```
@@ -86,6 +87,7 @@ ReputationListener.handleMessage
 -> UserMapper.updateReputation
 -> ReputationLogMapper.insert
 -> channel.basicAck
+-> 事务提交后 RankIndex.refreshReputation (Redis 信誉榜)
 ```
 
 核心处理：
@@ -95,6 +97,7 @@ ReputationListener.handleMessage
 - 信誉范围限制在 `[0, 12000]`。
 - 更新 `t_user.reputation`。
 - 写 `t_reputation_log`。
+- MySQL 事务提交后重新读取该用户最终信誉，更新 Redis 信誉榜；失败记日志并由每日重建校准。
 - 成功后手动 ACK。
 
 ## 5. 当前风险与待确认
@@ -103,4 +106,3 @@ ReputationListener.handleMessage
 - 审核驳回分支未发送 MQ，但 `ReputationListener` 支持 `pass=false` 扣分逻辑，需要确认业务是否需要失败扣信誉。
 - 消费失败时当前 `basicNack(deliveryTag, false, false)` 不回队列，没有死信队列配置。
 - 幂等依赖 `t_reputation_log` 查询，是否有唯一索引需要结合 DDL 确认。
-

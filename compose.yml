@@ -45,6 +45,8 @@ services:
       RABBITMQ_PORT: "5672"
       RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-admin}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?请在 .env 中设置 RABBITMQ_PASSWORD}
+      REDIS_HOST: lwg-redis
+      REDIS_PORT: "6379"
       # 两个数据服务需先接入 lwg 网络（见文件头注释）
       JAVA_OPTS: "-XX:MaxRAMPercentage=75 -XX:+UseSerialGC -Djava.net.preferIPv4Stack=true -Duser.timezone=Asia/Shanghai"
     ports:
@@ -52,6 +54,9 @@ services:
       - "127.0.0.1:8080:8080"
     networks:
       - lwg
+    depends_on:
+      lwg-redis:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -86,6 +91,26 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  # 排行榜投影存储：容器内部访问，AOF 用于加快重启恢复；MySQL 仍可重建榜单。
+  lwg-redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    container_name: lwg-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "128mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - lwg-redis-data:/data
+    networks:
+      - lwg
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 192m
 
   # ---- 以下两个仅用于「把已有容器接入本网络」的声明式写法，
   #      默认放在 profiles 里不启动；如需 compose 代为创建全新数据服务，
@@ -140,3 +165,4 @@ networks:
 volumes:
   lwg-mysql-data:
   lwg-rabbitmq-data:
+  lwg-redis-data:

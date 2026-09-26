@@ -49,6 +49,8 @@ public class MissionServiceImpl implements MissionService {
     private ObjectMapper objectMapper;
     @Resource
     private RabbitTemplate rabbitTemplate;
+    @Resource
+    private RankIndex rankIndex;
 
     public static final String MISSION_TOPIC = "lwg.mission.exchange";
     public static final String MISSION_ROUTING_KEY = "mission.settled";
@@ -287,6 +289,13 @@ public class MissionServiceImpl implements MissionService {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
+                    try {
+                        rankIndex.refreshCompleted(mission.getAcceptorId());
+                    } catch (Exception e) {
+                        // MySQL 已经提交，不应将榜单投影失败伪装成结算失败；每日重建会修复。
+                        org.slf4j.LoggerFactory.getLogger(MissionServiceImpl.class)
+                                .error("悬赏完成榜更新失败，userId={}", mission.getAcceptorId(), e);
+                    }
                     sendMessage(mission, req.getPass());
                 }
             });

@@ -2,6 +2,57 @@
 
 > 每次完成分析、文档更新或代码修改后，请追加记录。记录应说明改动目的、涉及文件、是否执行验证。
 
+## 2026-09-26：天道碑弹窗对齐悬赏令配色
+
+- 调整前端 `RankScroll.vue`：移除金色卷轴轴头与米金色卡片，采用 `MissionHall.vue` 发布悬赏弹窗相同的宣纸底色、深棕标题与强调色、浅棕边线及展开动画。排名数据和交互未改动。
+- 前端 `npm run build`、`git diff --check` 通过；在本地浏览器对照发布悬赏和天道碑弹窗，并检查桌面与 390px 手机布局。
+
+## 2026-09-26：天道碑改为卷轴弹窗并统一信誉显示
+
+- 前端 `RankScroll.vue` 取代独立的 `RankBoard.vue` 页面；`MissionHall.vue` 与 `UserDashboard.vue` 的天道碑入口在当前页打开浅色卷轴弹窗，旧 `/rank` 链接跳转大厅后自动展开。
+- `formatReputation` 让榜单和个人中心均以 `6000 → 60.00 分` 展示，排名计算仍使用后端原始整数。个人中心的“灵脉灌注”按钮固定图章与文字宽度，并在窄屏下重排资料卡。
+- 更新 `docs/ranking.md` 的入口与显示口径。前端 `npm run build` 通过；本地实际 MySQL、RabbitMQ、Redis 均为 UP，浏览器核对信誉榜 61.50/60.00、个人中心 60.00、悬赏完成榜、任务大厅和旧链接入口，并查看桌面与 390px 手机布局。
+
+## 2026-09-26：排行榜改用 Redis
+
+目的：宗门人数增多后，榜单日常请求从 Redis 有序集合读取，不再每次聚合所有 MySQL 任务，同时练习可重建的数据投影。
+
+- `pom.xml` 增加 Redis Starter；`application-dev.yml` / `application-prod.yml` 配置地址；`compose.yml` 增加带 AOF 与健康检查的内部 Redis 服务；`LwgApplication` 开启每日校准。
+- 新增 `RankIndex`：启动和每日从 MySQL 分批建榜，使用临时键和 Lua 原子替换；日常用 ZSET 查询前 N 名、参与人数和个人并列名次。
+- `RankServiceImpl.getBoard` 从 Redis 获取名次和分数，只通过 `RankMapper.selectProfiles` 读取当前页用户信息；`RankMapper.xml` 改为建榜、个人刷新和资料查询 SQL。
+- `MissionServiceImpl.auditMission` 在结算提交后刷新接单者完成数，`ReputationListener.handleMessage` 在信誉事务提交后刷新该用户信誉；刷新读取数据库最终值，不重复累加。Redis 写入异常记日志并由每日重建校准。
+- `AbstractIntegrationTest` 增加一次性 Redis 容器，`RankBoardTest` 验证 Redis 排名、增量刷新、空榜和键丢失后的重建。
+- 更新 `docs/ranking.md`、`docs/redis-usage.md`、`docs/business-flow.md`、`docs/mq-flow.md`。`docs/project-overview.md` 为之前已删除的工作区文件，本次保留该状态，模块信息见 `docs/ranking.md`。
+
+验证：
+
+- `TESTCONTAINERS_RYUK_DISABLED=true mvn test -DargLine=-Dfile.encoding=UTF-8 -Dlwg.test.mysql.image=arm64v8/mysql:latest -Dlwg.test.rabbitmq.image=arm64v8/rabbitmq:3.13.7 -Dlwg.test.redis.image=arm64v8/redis:latest`：13 项通过，0 失败。排名测试覆盖并列、稳定顺序、榜外个人名次、状态过滤、空榜、增量刷新和 Redis 键丢失重建。空榜测试通过 `JdbcTemplate` 修改夹具后需清理同事务 MyBatis 一级缓存，避免把旧 SQL 查询结果误认为 Redis 未更新。
+- 本地重启后 `/actuator/health` 的 MySQL、RabbitMQ、Redis 均为 `UP`；`RankIndex` 记录已从开发库重建信誉 2 人、完成 1 人；前端代理实际调用两种榜单成功，Redis `ZCARD` 分别为 2 和 1。
+- 最后一处同分 `ZCOUNT` 去重后，单独重跑 `RankBoardTest`：7 项通过，0 失败；`mvn -q -DskipTests package` 构建通过。此后自动审批额度限制阻止再次检查/重启本地进程，因此运行中的服务是否已加载最后这处优化未再确认。
+- 生产 Compose 使用占位环境变量执行 `docker compose config --quiet` 通过，仅验证配置可解析，尚未部署。
+
+## 2026-09-26
+
+### 功能：天道碑信誉榜与悬赏完成榜
+
+目的：为现有修仙悬赏玩法增加可比较的成长目标，落地用户选定的两种总榜。
+
+- 新增 `RankController.getBoard`（`GET /api/rank/board`）、`RankServiceImpl.getBoard`、`RankMapper`/XML、`RankTypeEnum`、`RankBoardVO`、`RankEntryVO`。
+- 信誉榜按当前信誉排名，空值按 6000；完成榜仅统计接单者已验收完成（status = 3）的任务，至少一单才上榜；仅正常账号参与。
+- MySQL `RANK()` 实现同分并列（1、1、3），同分按 ID 升序展示。默认前 50 位，个人排名按全榜计算；只读可重复读事务保持一次响应内统计一致。
+- 新增 Flyway `V2__ranking_index.sql`，为任务表添加 `(status, acceptor_id)` 索引。未变更任务结算、资金和 MQ 逻辑，未增加 Redis。
+- 前端 `lwg-ui` 新增 `RankBoard.vue`、`api/rank.js`、`/rank` 路由，并在 `MissionHall.vue`/`UserDashboard.vue` 增加天道碑入口。包含暗色页面、榜首徽记、当前用户高亮、个人名次、规则、刷新、空榜与重试、移动端布局和请求竞态保护。
+- 请求层 `inlineError` 为可选参数，仅新榜单开启，避免就地错误同时触发 toast。浏览器检查产物目录加入前端 `.gitignore`。
+- 新增 `docs/ranking.md`，更新 `docs/business-flow.md`。任务开始时 `docs/project-overview.md` 已在工作区被删除；从 HEAD 读取启动说明后保留该删除，新增模块结构记录在 `docs/ranking.md`。
+
+验证：
+
+- 完整后端回归：12 项通过，0 失败；新增 `RankBoardTest` 的 6 项 Testcontainers + MockMvc 测试覆盖并列排名、稳定顺序、榜外个人排名、禁用账号过滤、空信誉、空榜、非完成任务过滤、参数边界和刷新后的统计变化。V2 迁移随临时 MySQL 启动成功执行。
+- 本机使用缓存镜像 `arm64v8/mysql:latest`、`arm64v8/rabbitmq:3.13.7`。首次默认沙箱无法访问 Docker；授权后原有充值夹具受 JVM 默认编码影响，将中文道号读为重复问号，指定 `-DargLine=-Dfile.encoding=UTF-8` 后全部通过。测试仅操作一次性容器。
+- 前端 `npm run build` 通过；保留原有大 chunk 警告。
+- Playwright 真实浏览器 + 模拟接口数据：切榜、并列榜首徽记、本人行高亮、个人排名、390px/320px 无横向溢出、空榜、失败就地反馈与重试、榜外个人名次、仅一名参与者、旧请求不覆盖新榜，共 13 项检查通过，验证期间无未捕获 JavaScript 异常。桌面与手机截图在前端 `output/playwright/`。
+- 浏览器数据仅用于页面验证；未进行真实运行服务的前后端端到端联调，未部署生产、未提交 Git。
+
 ## 2026-09-19
 
 ### CI/CD：全链路打通（push → 测试 → 构建 → 自动部署）

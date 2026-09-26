@@ -21,6 +21,11 @@ spring:
     host: ${RABBITMQ_HOST:lwg-rabbitmq}
     port: ${RABBITMQ_PORT:5672}
 
+  data:
+    redis:
+      host: ${REDIS_HOST:lwg-redis}
+      port: ${REDIS_PORT:6379}
+
   flyway:
     # 生产为全新库，不需要 baseline；表结构完全由 V*.sql 演进
     baseline-on-migrate: false

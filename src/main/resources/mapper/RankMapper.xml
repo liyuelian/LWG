@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.li.lwg.mapper.RankMapper">
+    <!-- 只在建榜/对账时分批读取；榜单请求不执行全表排名。 -->
+    <select id="selectReputationScores" resultType="com.li.lwg.vo.RankEntryVO">
+        SELECT id AS user_id, COALESCE(reputation, 6000) AS score
+        FROM t_user
+        WHERE status = 1 AND id &gt; #{afterId}
+        ORDER BY id
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectCompletedScores" resultType="com.li.lwg.vo.RankEntryVO">
+        SELECT m.acceptor_id AS user_id, COUNT(*) AS score
+        FROM t_mission m
+        JOIN t_user u ON u.id = m.acceptor_id AND u.status = 1
+        WHERE m.status = 3 AND m.acceptor_id &gt; #{afterId}
+        GROUP BY m.acceptor_id
+        ORDER BY m.acceptor_id
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectReputationScore" resultType="long">
+        SELECT COALESCE(reputation, 6000)
+        FROM t_user WHERE id = #{userId} AND status = 1
+    </select>
+
+    <select id="selectCompletedScore" resultType="long">
+        SELECT COUNT(*)
+        FROM t_user u
+        JOIN t_mission m ON m.acceptor_id = u.id AND m.status = 3
+        WHERE u.id = #{userId} AND u.status = 1
+    </select>
+
+    <select id="selectProfiles" resultType="com.li.lwg.vo.RankEntryVO">
+        SELECT id AS user_id, username, realm
+        FROM t_user
+        WHERE status = 1 AND id IN
+        <foreach collection="userIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+</mapper>

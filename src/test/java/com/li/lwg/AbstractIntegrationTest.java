@@ -5,6 +5,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.containers.RabbitMQContainer;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import com.li.lwg.mapper.UserMapper;
@@ -41,6 +42,7 @@ public abstract class AbstractIntegrationTest {
 
     protected static final MySQLContainer<?> MYSQL;
     protected static final RabbitMQContainer RABBITMQ;
+    protected static final GenericContainer<?> REDIS;
 
     static {
         MYSQL = new MySQLContainer<>(compatibleImage(
@@ -52,8 +54,12 @@ public abstract class AbstractIntegrationTest {
         RABBITMQ = new RabbitMQContainer(compatibleImage(
                 System.getProperty("lwg.test.rabbitmq.image", "rabbitmq:3.13"), "rabbitmq"));
 
+        REDIS = new GenericContainer<>(DockerImageName.parse(
+                System.getProperty("lwg.test.redis.image", "redis:7"))).withExposedPorts(6379);
+
         MYSQL.start();
         RABBITMQ.start();
+        REDIS.start();
     }
 
     /**
@@ -89,6 +95,9 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.rabbitmq.username", RABBITMQ::getAdminUsername);
         registry.add("spring.rabbitmq.password", RABBITMQ::getAdminPassword);
         registry.add("spring.rabbitmq.virtual-host", () -> "/");
+
+        registry.add("spring.data.redis.host", REDIS::getHost);
+        registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
 
         registry.add("spring.flyway.baseline-on-migrate", () -> false);
 
